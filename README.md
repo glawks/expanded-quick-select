@@ -2,13 +2,22 @@
 
 A standalone Ratchet & Clank 1 OpenRAC mod intended to provide two independently editable eight-slot Quick Select pages, switched using L1/R1 while holding Triangle.
 
-**Not installable yet.** This repository is a fresh rebuild. The current native entry point is a scaffold only and deliberately registers no game hooks. It does not yet change the weapon wheel.
+**Experimental development build.** The game hooks and second-page editor are wired in, but the live mod is **not yet verified in-game**. Make a backup of your save before testing, and expect possible missing icons, UI glitches or crashes. This is not a stable launcher release.
 
 The existing Weapon Wheel Pause mod is not part of this repository and remains untouched.
 
 ## Build environment
 
-The native build requires the official OpenRAC Mod SDK (1.11 or newer), CMake 3.20+, and a C++17 compiler. Configure CMake so it can find `OpenRACMod` in the SDK's CMake package directory. Use the official OpenRAC native-mod template's SDK-fetching workflow when packaging a release.
+The native build requires the official OpenRAC Mod SDK (1.14.5 pinned here), CMake 3.20+, and a C++17 compiler. The development workflow on GitHub Actions builds and tests a **Windows x64 artifact** on pushes to `development`. It does not publish a release.
+
+### Testing controls
+
+- Gameplay: hold **Triangle** to open Quick Select; press **L1 or R1** to switch between eight-slot pages. The wheel starts on page 1 each time it opens.
+- Pause-menu Quick Select editor: **L2/R2** switch pages. **L1/R1** keep their original slot-selection behaviour, and **Cross** assigns an item to the visible page.
+- Page 1 remains stored by the game. Page 2 uses a separate file under OpenRAC's mod data folder, one for each memory-card save slot.
+- The HUD displays `PAGE 1 / 2` or `PAGE 2 / 2` while Triangle is held. The pause editor does not yet show a page-number label.
+
+To test: open the repository's **Actions → Windows development build** run, download the `expanded-quick-select-windows-test` artifact, extract the mod ZIP and install that ZIP through OpenRAC's Mods tab. No stable release is published.
 
 ```sh
 cmake -S . -B build -DBUILD_TESTING=ON -DBUILD_OPENRAC_MOD=OFF
@@ -16,7 +25,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Enable `-DBUILD_OPENRAC_MOD=ON` when the SDK is available. Do not install or release this scaffold as a functioning mod.
+Fetch the SDK with `python tools/fetch_sdk.py` and configure with `-DBUILD_OPENRAC_MOD=ON` for the real native mod. The fetch script verifies the SDK archive against its published SHA-256 file.
 
 Without CMake, the dependency-free logic tests can also be run on Linux/macOS with `bash scripts/test-local.sh`.
 
@@ -25,6 +34,7 @@ Without CMake, the dependency-free logic tests can also be run on Linux/macOS wi
 - [x] Project identity, basic manifest and native load entry point
 - [x] Pure C++ two-page assignment model and debounced input behaviour
 - [x] Versioned, validated, per-save-slot secondary-page storage (core only)
-- [ ] Live in-game wheel and editor hooks
-- [ ] Save lifecycle and in-game testing
-- [ ] Official SDK CI/release packaging
+- [x] Development hooks for the gameplay wheel and pause-menu editor
+- [x] Save/restore entry points and guarded secondary-page persistence
+- [ ] Real SDK build confirmation and in-game test on a backed-up save
+- [x] Windows development artifact workflow (no public release)

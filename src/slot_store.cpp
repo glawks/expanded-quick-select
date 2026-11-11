@@ -21,7 +21,8 @@ constexpr std::size_t kItemCount = 8;
 constexpr std::size_t kBodySize = 4 + 2 + 2 + 4 * kItemCount;
 constexpr std::size_t kFileSize = kBodySize + 4;
 constexpr int kMaxSaveSlot = 127;
-constexpr std::int32_t kMaxItemId = 255;
+// RAC1's quick-select item table is indexed by actual item IDs 0..39.
+constexpr std::int32_t kMaxItemId = 39;
 using Bytes = std::array<std::uint8_t, kFileSize>;
 
 bool valid_slot(int slot) { return slot >= 0 && slot <= kMaxSaveSlot; }

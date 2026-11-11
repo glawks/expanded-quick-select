@@ -58,6 +58,8 @@ int main() {
     const Slots invalid{{1, 2, 3, -1, 5, 6, 7, 8}};
     assert(!store.save(1, invalid));
     assert(store.load(1).value() == page_b);
+    const Slots too_high{{1, 2, 3, 40, 5, 6, 7, 8}};
+    assert(!store.save(1, too_high));
     const fs::path blocker = dir / "a-file-not-a-directory";
     { std::ofstream out(blocker); out << "x"; }
     SlotStore blocked(blocker);
