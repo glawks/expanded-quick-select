@@ -55,3 +55,20 @@ This is an **experimental hook implementation**. The user confirmed the wheel wo
 - The original bits are restored after the hero update, avoiding changes to gameplay actions outside Quick Select.
 - Source-level tests cover Triangle-on/off, both shoulders, and unrelated buttons.
 - Runtime behaviour with and without Weapon Wheel Pause must be tested in-game; no claims are made about its correctness before this test.
+
+
+## v0.1.2: airborne slam regression
+- In-game report confirmed v0.1.1 suppressed ordinary ground crouch but airborne
+  Thruster-Pack slam still triggered alongside Quick Select page navigation.
+- Confirmed RAC1's `process_pad_input` appends `pressed` to PadState's
+  `hist_btn[30]` ring, and `pad_pressed_within` scans this ring to recognise
+  recent presses, bypassing the v0.1.1 current-state-only filter.
+- A new `Pad_ProcessReport` hook calls the original input processor first, then,
+  while Triangle is held on the primary pad, removes L1/R1 from the newest
+  recorded press and gameplay-facing held/pressed/raw fields, leaving
+  held_unmasked/pressed_unmasked intact for the weapon-wheel mod.
+- The v0.1.1 Hero_Update scoped filter remains as a secondary safeguard.
+- New unit assertions cover wrap-around of the last history index and removal
+  of R1 without removing unrelated button presses.
+- In-game verification is still required; code build alone cannot prove this
+  fixes the slam or every pad configuration.

@@ -20,6 +20,13 @@ int main() {
     assert(filtered_gameplay_buttons(0x1C, gameplay_shoulder_mask(0x1C)) == 0x10);
     assert(filtered_gameplay_buttons(0x48, gameplay_shoulder_mask(0x48)) == 0x48);
     assert(filtered_gameplay_buttons(0x08, gameplay_shoulder_mask(0x08)) == 0x08);
+    // RAC1's airborne action also reads a 30-frame history of presses.
+    // The newest history record must lose R1 when Triangle is held.
+    assert(last_history_index(0) == 29);
+    assert(last_history_index(1) == 0);
+    assert(last_history_index(29) == 28);
+    assert(filtered_gameplay_buttons(0x48, gameplay_shoulder_mask(0x18)) == 0x40);
+    assert(filtered_gameplay_buttons(0x48, gameplay_shoulder_mask(0x08)) == 0x48);
 
     const Slots first{{1, 2, 3, 4, 5, 6, 7, 8}};
     const Slots second{{9, 10, 11, 12, 13, 14, 15, 16}};

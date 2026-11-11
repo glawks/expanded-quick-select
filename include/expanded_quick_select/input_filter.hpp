@@ -16,4 +16,9 @@ constexpr std::uint32_t filtered_gameplay_buttons(std::uint32_t buttons,
                                                   std::uint32_t mask) noexcept {
     return buttons & ~mask;
 }
+// Pad_ProcessReport records the current frame at hist_btn[hist_idx] and then
+// advances hist_idx. This returns the index of that just-recorded frame.
+constexpr std::uint32_t last_history_index(std::uint32_t next_index) noexcept {
+    return (next_index + 29u) % 30u;
+}
 } // namespace expanded_quick_select

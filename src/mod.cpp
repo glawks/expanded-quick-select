@@ -206,6 +206,45 @@ void load(openrac::Mod& mod) {
     runtime = std::make_unique<Runtime>(mod);
     Runtime& r = *runtime;
 
+    // Process controller input before the hero/world tick sees it. Some
+    // airborne actions consult PadState.hist_btn (recent presses), not just
+    // the current held/pressed fields filtered by Hero_Update below.
+    // Keep held_unmasked intact: the gameplay wheel reads those bits to
+    // recognise L1/R1 and switch pages.
+    mod.hook<openrac::rac1::Pad_ProcessReport>(
+        [&r](auto original, std::uint32_t pad, std::uint32_t report, std::int32_t size) {
+            original(pad, report, size);
+            if (pad != r.exe(kPadState)) return; // only the primary controller
+            const auto mem = r.mod.memory();
+            const auto unmasked = mem.read<std::uint32_t>(pad + 0x1C0);
+            const auto mask = eqs::gameplay_shoulder_mask(unmasked);
+            if (mask == 0) return;
+            // Clear the most recently recorded press from the 30-frame ring.
+            // On leaving Quick Select the game must not treat that R1 page
+            // change as a fresh airborne slam through pad_pressed_within().
+            const auto count = mem.read<std::int32_t>(pad + 0x190);
+            const auto next = mem.read<std::int16_t>(pad + 0x18E);
+            if (count > 0 && count <= 30 && next >= 0 && next < 30) {
+                const auto last = eqs::last_history_index(
+                    static_cast<std::uint32_t>(next));
+                const auto addr = static_cast<openrac::gaddr>(pad + 0x1E0 + last * 4);
+                const auto pressed = mem.read<std::uint32_t>(addr);
+                mem.write<std::uint32_t>(
+                    addr, eqs::filtered_gameplay_buttons(pressed, mask));
+            }
+            // Also prevent other per-frame world/gameplay handlers from
+            // seeing the same wheel-only shoulder presses.
+            constexpr std::array<openrac::gaddr, 4> offsets{
+                0x1A0, 0x1A4, 0x1B0, 0x1B4
+            };
+            for (const auto offset : offsets) {
+                const auto addr = static_cast<openrac::gaddr>(pad + offset);
+                const auto buttons = mem.read<std::uint32_t>(addr);
+                mem.write<std::uint32_t>(
+                    addr, eqs::filtered_gameplay_buttons(buttons, mask));
+            }
+        });
+
     mod.hook<openrac::rac1::Hero_Update>([&r](auto original) {
         ScopedHeroShoulderFilter filter(r);
         original();
