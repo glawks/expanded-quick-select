@@ -15,7 +15,7 @@ The native build requires the official OpenRAC Mod SDK (1.14.5 pinned here), CMa
 - Gameplay: hold **Triangle** to open Quick Select; press **L1 or R1** to switch between eight-slot pages. The wheel starts on page 1 each time it opens. In v0.1.2, shoulder presses while Triangle is held are consumed before world input handling, including the pad's recent-press history, rather than being interpreted as a gameplay attack or Thruster-Pack action.
 - Pause-menu Quick Select editor: **L2/R2** switch pages. **L1/R1** keep their original slot-selection behaviour, and **Cross** assigns an item to the visible page.
 - Page 1 remains stored by the game. Page 2 uses a separate file under OpenRAC's mod data folder, one for each memory-card save slot.
-- The HUD displays `PAGE 1 / 2` or `PAGE 2 / 2` while Triangle is held. The pause editor does not yet show a page-number label.
+- The HUD displays `PAGE 1 / 2` or `PAGE 2 / 2` while Triangle is held. In v0.1.3, the pause editor also draws `L2   PAGE 1 / 2   R2` (or page 2) at the bottom of the right-hand ring panel, using the game's own small menu font.
 
 To test: open the repository's **Actions → Windows development build** run, download the `expanded-quick-select-windows-test` artifact, extract the mod ZIP and install that ZIP through OpenRAC's Mods tab. No stable release is published.
 
@@ -39,3 +39,5 @@ Without CMake, the dependency-free logic tests can also be run on Linux/macOS wi
 - [x] SDK compilation and initial in-game wheel/editor test
 - [ ] Verify v0.1.2 early input/history suppression while jumping with the wheel open
 - [x] Windows development artifact workflow (no public release)
+
+**v0.1.3 editor footer is experimental:** the native-font rendering path borrows and restores an existing message table entry and HUD text buffer during the ring draw. It has build checks but is not yet verified in-game; if a font/layout issue occurs, use v0.1.2 instead. No gameplay-wheel inputs were changed.

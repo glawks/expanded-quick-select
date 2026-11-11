@@ -2,7 +2,7 @@
   "format": 2,
   "id": "expanded-quick-select",
   "name": "Expanded Quick Select",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "glawks",
   "description": "Adds a second independently editable eight-slot Quick Select page to Ratchet & Clank 1.",
   "type": "native",
@@ -24,6 +24,8 @@
     "rac1.menu.quick_select.store",
     "rac1.save.prepare",
     "rac1.save.restore",
-    "rac1.save.new_game"
+    "rac1.save.new_game",
+    "rac1.menu.quick_select.draw",
+    "rac1.menu.item_text.draw"
   ]
 }

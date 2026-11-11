@@ -1,10 +1,12 @@
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/input_filter.hpp"
+#include "expanded_quick_select/editor_hint.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
 #include <cassert>
+#include <string_view>
 
 using namespace expanded_quick_select;
 
@@ -52,6 +54,13 @@ int main() {
     wheel.after_update(banks, false);
     assert(wheel.before_update(banks, true, false, false));
     assert(banks.active_page() == Page::Primary); // fresh wheel begins at page 1
+
+    assert(std::string_view(editor_page_hint(Page::Primary)) ==
+           "L2   PAGE 1 / 2   R2");
+    assert(std::string_view(editor_page_hint(Page::Secondary)) ==
+           "L2   PAGE 2 / 2   R2");
+    assert(editor_label_scroll_16ths(200) == -172 * 16);
+    assert(editor_label_scroll_16ths(32) == 0);
 
     EditorSession editor;
     editor.begin(banks);

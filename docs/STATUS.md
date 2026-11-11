@@ -72,3 +72,11 @@ This is an **experimental hook implementation**. The user confirmed the wheel wo
   of R1 without removing unrelated button presses.
 - In-game verification is still required; code build alone cannot prove this
   fixes the slam or every pad configuration.
+
+## v0.1.3 — native pause editor hint (untested)
+
+- Hook `rac1.menu.quick_select.draw` to draw a footer after the game's ring.
+- Hook `rac1.menu.item_text.draw` to reuse the game's own small menu font.
+- Temporary backed-up screen and help-message table fields are restored after the callback. HUD text is not used because OpenRAC draws it behind menus.
+- Bottom line: `L2   PAGE 1 / 2   R2` / `L2   PAGE 2 / 2   R2`, reflecting the editor's active page.
+- Native text setup, placement and message table lookup still need in-game verification on PAL and NTSC-U. v0.1.2 remains the last verified gameplay build.
