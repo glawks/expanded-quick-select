@@ -45,3 +45,20 @@ Without CMake, the dependency-free logic tests can also be run on Linux/macOS wi
 **v0.1.4 editor footer test:** the first attempt did not show the footer on NTSC-U. The menu renderer now selects an existing valid help record without assuming its ID range and logs each stage with `Quick Select footer:` in the OpenRAC log. If the line still does not appear, please copy those lines; they identify whether it is a message lookup, menu text hook, or drawing position issue. v0.1.2 is the proven fallback.
 
 **v0.1.5 footer-address correction:** the v0.1.4 log (`message table invalid: ptr=0 count=1515`) revealed a wrong NTSC-U help-table address. The NTSC pointer is at `0x0015F6A0`, not the generic -0x100 translation of the PAL address. The renderer now borrows and restores the bytes of an existing sufficiently long help message instead of writing to an unverified HUD buffer. This requires an in-game test; stay on v0.1.2 if rendering is unstable.
+
+### v0.1.6 — Quick Select input safety
+
+RAC1's airborne slam checks both R1 and R2, but v0.1.5 only suppressed L1/R1.
+While Triangle Quick Select is held **or** the Quick Select pause editor is
+active, v0.1.6 filters all four shoulder inputs from gameplay handling and
+recent-press history, without filtering the unmasked menu inputs. R1/L1
+navigation and L2/R2 editor-page changes remain available; outside the wheel
+and editor, slam/crouch controls remain unchanged. The wheel and pause-page
+labels are unchanged.
+
+**Save note:** Page 2 already persists as `save-slot-<n>.dat` in the mod's
+OpenRAC `data_dir()`. Page 1 is stored in the vanilla game's save. Loading or
+resaving while the mod is disabled can therefore change page 1's assignments;
+it should not remove the separate page-2 file. Report any apparent loss of
+page 2 separately so the save-slot identity and data-folder behaviour can be
+checked.

@@ -177,7 +177,8 @@ public:
     explicit ScopedHeroShoulderFilter(Runtime& r) : state(r) {
         const auto pad = r.exe(kPadState);
         mask = eqs::gameplay_shoulder_mask(
-            r.mod.memory().read<std::uint32_t>(pad + 0x1C0));
+            r.mod.memory().read<std::uint32_t>(pad + 0x1C0),
+            r.editor.active());
         if (mask == 0) return;
         for (std::size_t i = 0; i < kOffsets.size(); ++i) {
             const auto address = pad + kOffsets[i];
@@ -347,18 +348,19 @@ void load(openrac::Mod& mod) {
     runtime = std::make_unique<Runtime>(mod);
     Runtime& r = *runtime;
 
-    // Process controller input before the hero/world tick sees it. Some
-    // airborne actions consult PadState.hist_btn (recent presses), not just
-    // the current held/pressed fields filtered by Hero_Update below.
-    // Keep held_unmasked intact: the gameplay wheel reads those bits to
-    // recognise L1/R1 and switch pages.
+    // Process controller input before the hero/world tick sees it. RAC1's
+    // airborne slam can be triggered by R1 OR R2, and some actions consult
+    // PadState.hist_btn (recent presses), not just current held/pressed.
+    // Filter all shoulder gameplay actions during Triangle Quick Select or
+    // the pause editor, leaving held_unmasked/pressed_unmasked intact so
+    // L1/R1 still navigate the wheel/slots and L2/R2 switch editor pages.
     mod.hook<openrac::rac1::Pad_ProcessReport>(
         [&r](auto original, std::uint32_t pad, std::uint32_t report, std::int32_t size) {
             original(pad, report, size);
             if (pad != r.exe(kPadState)) return; // only the primary controller
             const auto mem = r.mod.memory();
             const auto unmasked = mem.read<std::uint32_t>(pad + 0x1C0);
-            const auto mask = eqs::gameplay_shoulder_mask(unmasked);
+            const auto mask = eqs::gameplay_shoulder_mask(unmasked, r.editor.active());
             if (mask == 0) return;
             // Clear the most recently recorded press from the 30-frame ring.
             // On leaving Quick Select the game must not treat that R1 page

@@ -96,3 +96,21 @@ This is an **experimental hook implementation**. The user confirmed the wheel wo
 - No longer borrow an unverified HUD text buffer. During a draw, temporarily replace a sufficiently long existing help message with the footer and restore its original bytes immediately afterward.
 - Gameplay wheel, pad history fix, saves and page changing unchanged.
 - Logs now include message pointer slot, pointer and count if lookup fails, or a native draw attempt.
+
+## v0.1.6 — R2 airborne slam reported with the gameplay wheel open
+
+- User verified v0.1.5's pause editor hint, page persistence across normal
+  restarts and mod reactivation.
+- The game's `hero_gadget_use.c` checks
+  `g_controller_state.held & (PAD_R2 | PAD_R1)` for movement/attack states.
+  The v0.1.2 input filter only consumed L1/R1, leaving R2 able to trigger a
+  slam with Triangle Quick Select open.
+- Broadened mask to L2/R2/L1/R1 for gameplay-facing pad fields and the newest
+  history entry while Triangle is held or the pause editor is active.
+  Menu/gameplay Quick Select reads `*_unmasked`, so switching stays intact.
+  No masking occurs outside these two contexts.
+- Added regression assertions for R2 held and history, R1/L1 navigation, all
+  four shoulders in the editor, and normal R1/R2 outside Quick Select.
+- Page-2 storage already exists under the mod's data_dir; no changes to the
+  established save format or slot-mapping were made.
+- **In-game verification required**, especially with the pause mod enabled.

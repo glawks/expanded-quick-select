@@ -13,14 +13,27 @@ using namespace expanded_quick_select;
 int main() {
     // R1/L1 used to turn wheel pages must not reach hero actions (R1 slam).
     // Gameplay inputs are unchanged as soon as Triangle is released.
+    // R1 and R2 both trigger airborne slam in RAC1; neither may do so
+    // while Quick Select or its pause editor is active. Outside both,
+    // normal shoulder controls must be completely preserved.
     assert(gameplay_shoulder_mask(0x00) == 0);
-    assert(gameplay_shoulder_mask(0x08) == 0); // R1 without Triangle: normal slam
-    assert(gameplay_shoulder_mask(0x10) == 0x0C);
-    assert(gameplay_shoulder_mask(0x18) == 0x0C);
-    assert(gameplay_shoulder_mask(0x14) == 0x0C);
+    assert(gameplay_shoulder_mask(0x02) == 0); // R2 outside wheel: normal slam
+    assert(gameplay_shoulder_mask(0x08) == 0); // R1 outside wheel: normal slam
+    assert(gameplay_shoulder_mask(0x0F) == 0); // all shoulders, no Triangle
+    assert(gameplay_shoulder_mask(0x10) == 0x0F);
+    assert(gameplay_shoulder_mask(0x12) == 0x0F); // Triangle+R2
+    assert(gameplay_shoulder_mask(0x18) == 0x0F); // Triangle+R1
+    assert(gameplay_shoulder_mask(0x14) == 0x0F); // Triangle+L1
+    assert(gameplay_shoulder_mask(0x1F) == 0x0F); // Triangle+all shoulders
+    assert(gameplay_shoulder_mask(0x02, true) == 0x0F); // pause editor R2
+    assert(gameplay_shoulder_mask(0x08, true) == 0x0F); // pause editor R1
+    assert(gameplay_shoulder_mask(0x00, false) == 0);
+    assert(filtered_gameplay_buttons(0x12, gameplay_shoulder_mask(0x12)) == 0x10);
     assert(filtered_gameplay_buttons(0x18, gameplay_shoulder_mask(0x18)) == 0x10);
-    assert(filtered_gameplay_buttons(0x1C, gameplay_shoulder_mask(0x1C)) == 0x10);
+    assert(filtered_gameplay_buttons(0x1F, gameplay_shoulder_mask(0x1F)) == 0x10);
+    assert(filtered_gameplay_buttons(0x42, gameplay_shoulder_mask(0x02, true)) == 0x40);
     assert(filtered_gameplay_buttons(0x48, gameplay_shoulder_mask(0x48)) == 0x48);
+    assert(filtered_gameplay_buttons(0x02, gameplay_shoulder_mask(0x02)) == 0x02);
     assert(filtered_gameplay_buttons(0x08, gameplay_shoulder_mask(0x08)) == 0x08);
     // RAC1's airborne action also reads a 30-frame history of presses.
     // The newest history record must lose R1 when Triangle is held.
@@ -28,7 +41,9 @@ int main() {
     assert(last_history_index(1) == 0);
     assert(last_history_index(29) == 28);
     assert(filtered_gameplay_buttons(0x48, gameplay_shoulder_mask(0x18)) == 0x40);
+    assert(filtered_gameplay_buttons(0x42, gameplay_shoulder_mask(0x12)) == 0x40);
     assert(filtered_gameplay_buttons(0x48, gameplay_shoulder_mask(0x08)) == 0x48);
+    assert(filtered_gameplay_buttons(0x42, gameplay_shoulder_mask(0x02)) == 0x42);
 
     const Slots first{{1, 2, 3, 4, 5, 6, 7, 8}};
     const Slots second{{9, 10, 11, 12, 13, 14, 15, 16}};
