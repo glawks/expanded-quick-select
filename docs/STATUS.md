@@ -80,3 +80,10 @@ This is an **experimental hook implementation**. The user confirmed the wheel wo
 - Temporary backed-up screen and help-message table fields are restored after the callback. HUD text is not used because OpenRAC draws it behind menus.
 - Bottom line: `L2   PAGE 1 / 2   R2` / `L2   PAGE 2 / 2   R2`, reflecting the editor's active page.
 - Native text setup, placement and message table lookup still need in-game verification on PAL and NTSC-U. v0.1.2 remains the last verified gameplay build.
+
+## v0.1.4 — page hint visible-state diagnostics
+
+- User confirmed v0.1.3 loads but no editor footer appears (NTSC-U).
+- Corrected the overly restrictive help-message ID filter (first 32 entries with IDs 0x4000..0x5FFF); now select the first plausible message record in the active language table. The `help_msgs` global is indeed a pointer, not an inline table.
+- The footer logs each stage once or on state changes (editor opened, native font callback seen, missing font, message-table/record issue, viewport dimensions or attempted native draw).
+- No changes to existing gameplay selection, jump input or save logic. Still awaiting in-game rendering check.

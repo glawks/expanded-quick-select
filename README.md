@@ -41,3 +41,5 @@ Without CMake, the dependency-free logic tests can also be run on Linux/macOS wi
 - [x] Windows development artifact workflow (no public release)
 
 **v0.1.3 editor footer is experimental:** the native-font rendering path borrows and restores an existing message table entry and HUD text buffer during the ring draw. It has build checks but is not yet verified in-game; if a font/layout issue occurs, use v0.1.2 instead. No gameplay-wheel inputs were changed.
+
+**v0.1.4 editor footer test:** the first attempt did not show the footer on NTSC-U. The menu renderer now selects an existing valid help record without assuming its ID range and logs each stage with `Quick Select footer:` in the OpenRAC log. If the line still does not appear, please copy those lines; they identify whether it is a message lookup, menu text hook, or drawing position issue. v0.1.2 is the proven fallback.

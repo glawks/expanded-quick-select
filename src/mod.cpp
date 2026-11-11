@@ -49,6 +49,13 @@ struct Runtime {
     bool label_visible = false;
     // Acquired from the game's own menu-label hook when it runs.
     openrac::rac1::Menu_ItemText_Draw::fn menu_text_draw = nullptr;
+    std::string footer_diagnostic;
+
+    void footer_note(const std::string& message) {
+        if (footer_diagnostic == message) return;
+        footer_diagnostic = message;
+        mod.info("Quick Select footer: " + message);
+    }
 
     openrac::gaddr exe(openrac::gaddr pal) const {
         return mod.relocate(static_cast<openrac::gaddr>(pal + shift));
@@ -215,38 +222,64 @@ private:
 class ScopedEditorHint {
 public:
     ScopedEditorHint(Runtime& r, openrac::gaddr screen) : state(r), screen_address(screen) {
-        if (!r.menu_text_draw || !r.editor.active() || screen == 0) return;
+        if (!r.editor.active() || screen == 0) {
+            diagnostic = "editor inactive / invalid screen";
+            return;
+        }
+        if (!r.menu_text_draw) {
+            diagnostic = "menu font callback not yet observed";
+            return;
+        }
         const auto mem = r.mod.memory();
+
+        // RAC1's help_msgs at 0x15F780 holds a POINTER to the current
+        // language's help-message entries, not the entries themselves.
+        // The pause menu swaps this pointer while loading its own text.
         const auto table = mem.read<openrac::gaddr>(r.exe(kHelpEntries));
         const auto count = mem.read<std::int32_t>(r.exe(kHelpState) + 0x2C);
-        if (table < 0x10000 || table >= 0x2000000 || count <= 0 || count > 4096) return;
+        if (table < 0x10000 || table >= 0x2000000 || count <= 0 || count > 4096 ||
+            static_cast<std::uint64_t>(table) + static_cast<std::uint64_t>(count) * 16u > 0x2000000) {
+            diagnostic = "message table invalid: ptr=" + std::to_string(table) +
+                         " count=" + std::to_string(count);
+            return;
+        }
 
-        // The first valid help message with a nonzero ID is safe to borrow:
-        // Help_FindIndex searches the same table from the beginning.
+        // Message IDs differ by language and version. v0.1.3 erroneously
+        // assumed one of the first 32 IDs would be in 0x4000..0x5FFF.
+        // Borrow the first real record whose original string points into
+        // game RAM. Do not modify the table until all checks have passed.
         openrac::gaddr entry = 0;
         std::int32_t message_id = 0;
-        for (int i = 0; i < count && i < 32; ++i) {
-            const auto address = static_cast<openrac::gaddr>(table + i * 16);
-            const auto id = mem.read<std::int32_t>(address + 4);
-            if (id >= 0x4000 && id < 0x6000) {
-                entry = address;
+        openrac::gaddr pointer = 0;
+        for (int i = 0; i < count; ++i) {
+            const auto candidate = static_cast<openrac::gaddr>(table + i * 16);
+            const auto id = mem.read<std::int32_t>(candidate + 4);
+            const auto text_pointer = mem.read<openrac::gaddr>(candidate);
+            if (id > 0 && id < 65536 && text_pointer >= 0x10000 &&
+                text_pointer < 0x2000000) {
+                entry = candidate;
                 message_id = id;
+                pointer = text_pointer;
                 break;
             }
         }
-        if (entry == 0) return;
+        if (entry == 0) {
+            diagnostic = "no valid message record: ptr=" + std::to_string(table) +
+                         " count=" + std::to_string(count);
+            return;
+        }
 
-        const auto old_screen = mem.read<std::array<std::uint8_t, 0x54>>(screen);
-        const auto old_text = mem.read<std::array<std::uint8_t, 80>>(r.exe(kHudMessageBuffer));
-        const auto old_pointer = mem.read<openrac::gaddr>(entry);
         const int height = mem.read<std::int32_t>(screen + 0x24);
         const int width = mem.read<std::int32_t>(screen + 0x20);
-        if (height < 120 || height > 512 || width < 120 || width > 512) return;
-        if (old_pointer < 0x10000 || old_pointer >= 0x2000000) return;
+        if (height < 120 || height > 512 || width < 120 || width > 512) {
+            diagnostic = "unexpected panel size " + std::to_string(width) +
+                         "x" + std::to_string(height);
+            return;
+        }
 
-        saved_screen = old_screen;
-        saved_text = old_text;
-        saved_pointer = old_pointer;
+        saved_screen = mem.read<std::array<std::uint8_t, 0x54>>(screen);
+        saved_text = mem.read<std::array<std::uint8_t, 80>>(r.exe(kHudMessageBuffer));
+        saved_pointer = pointer;
         entry_address = entry;
         active = true;
 
@@ -256,17 +289,20 @@ public:
         mem.write(r.exe(kHudMessageBuffer), text);
         mem.write<openrac::gaddr>(entry, r.exe(kHudMessageBuffer));
 
-        // MenuLabelData at +0x30: fixed text ID, game small font, horizontally
-        // centred, marquee disabled. Negative scroll places it near the foot.
+        // Render through RAC1's small menu font. Using a temporary
+        // label description avoids changing the static menu definition.
         constexpr std::int32_t kLabelFlags = 0x2000 | 0x10 | 0x04 | 0x01;
         mem.write<std::int32_t>(screen + 0x30, kLabelFlags);
         mem.write<std::int32_t>(screen + 0x34, message_id);
         mem.write<std::uint32_t>(screen + 0x38, 0);
-        mem.write<std::int32_t>(
-            screen + 0x3C, eqs::editor_label_scroll_16ths(height));
+        mem.write<std::int32_t>(screen + 0x3C, eqs::editor_label_scroll_16ths(height));
         mem.write<std::int32_t>(screen + 0x44, 0x100);
         mem.write<std::int32_t>(screen + 0x48, 0);
         mem.write<std::int32_t>(screen + 0x4C, 0);
+
+        diagnostic = "native draw reached, message ID " + std::to_string(message_id) +
+                     ", panel " + std::to_string(width) + "x" +
+                     std::to_string(height);
     }
     ~ScopedEditorHint() {
         if (!active) return;
@@ -276,6 +312,7 @@ public:
         mem.write<openrac::gaddr>(entry_address, saved_pointer);
     }
     bool ready() const noexcept { return active; }
+    const std::string& outcome() const noexcept { return diagnostic; }
     ScopedEditorHint(const ScopedEditorHint&) = delete;
     ScopedEditorHint& operator=(const ScopedEditorHint&) = delete;
 private:
@@ -285,6 +322,7 @@ private:
     openrac::gaddr saved_pointer = 0;
     std::array<std::uint8_t, 0x54> saved_screen{};
     std::array<std::uint8_t, 80> saved_text{};
+    std::string diagnostic{"not attempted"};
     bool active = false;
 };
 
@@ -369,18 +407,21 @@ void load(openrac::Mod& mod) {
         [&r](auto original, std::uint32_t label) {
             // Keep the original game's function pointer for the ring's
             // extra hint, which needs the game's font and menu layer.
+            if (!r.menu_text_draw && r.editor.active())
+                r.footer_note("game text renderer was called");
             r.menu_text_draw = original.get();
             return original(label);
         });
     mod.hook<openrac::rac1::Menu_QuickSelect_Draw>(
         [&r](auto original, std::uint32_t screen) {
             const auto result = original(screen);
-            if (r.editor.active() && r.menu_text_draw) {
+            if (r.editor.active()) {
                 // A footer failure must not cause the SDK to repeat the
                 // original ring draw, or leave borrowed menu memory changed.
                 try {
                     ScopedEditorHint footer(r, screen);
                     if (footer.ready()) r.menu_text_draw(screen);
+                    r.footer_note(footer.outcome());
                 } catch (const std::exception& e) {
                     r.mod.warn(std::string("Quick Select footer skipped: ") + e.what());
                 }
@@ -394,6 +435,8 @@ void load(openrac::Mod& mod) {
         if (eqs::valid_game_slots(visible)) r.banks.set_primary(visible);
         r.editor.begin(r.banks);
         r.editor_address = page;
+        r.footer_diagnostic.clear();
+        r.mod.info("Quick Select footer: editor opened");
         return result;
     });
     mod.hook<openrac::rac1::Menu_ItemSlots_Update>([&r](auto original, std::uint32_t page) {
