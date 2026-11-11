@@ -7,6 +7,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <string>
 
 using expanded_quick_select::SlotStore;
 using expanded_quick_select::Slots;
