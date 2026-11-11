@@ -109,17 +109,25 @@ public:
         previous_slots = mem.read<eqs::Slots>(slots_address);
         previous_cache = mem.read<std::array<HudEntry, 8>>(cache_address);
         if (!eqs::valid_game_slots(previous_slots)) return;
+        const auto definitions = r.overlay(kItemDefs);
+        std::size_t validated_items = 0;
         for (std::size_t i = 0; i < 8; ++i) {
-            if (previous_cache[i].item != previous_slots[i]) {
+            const auto id = static_cast<openrac::gaddr>(previous_slots[i]);
+            const bool id_matches = previous_cache[i].item == previous_slots[i];
+            const bool icon_matches = id == 0 || previous_cache[i].icon ==
+                mem.read<std::uint16_t>(definitions + id * 0x4C + 0x38);
+            if (!id_matches || !icon_matches) {
                 if (!r.warned_layout) {
                     r.mod.warn("Quick Select HUD layout mismatch; page 2 projection disabled");
                     r.warned_layout = true;
                 }
                 return;
             }
+            if (id != 0) ++validated_items;
         }
+        // All-zero memory would pass an ID-only check even at a wrong address.
+        if (validated_items == 0) return;
         auto alternate_cache = previous_cache;
-        const auto definitions = r.overlay(kItemDefs);
         for (std::size_t i = 0; i < 8; ++i) {
             const auto id = static_cast<openrac::gaddr>(second[i]);
             alternate_cache[i].item = second[i];

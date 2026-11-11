@@ -22,12 +22,12 @@ This is an **experimental hook implementation awaiting a real SDK build and in-g
 
 - The `scripts/test-local.sh` core suite passes under GNU C++17 including `-DNDEBUG`.
 - The manifest is syntactically valid JSON.
-- No OpenRAC SDK or CMake is installed in this workspace, so the OpenRAC plugin itself has **not** been compiled, loaded, or tested in-game.
+- GitHub Actions Windows x64 on the `development` branch compiled the native mod with SDK 1.14.5, ran the unit tests, and packaged a development ZIP. This is **build verification only**, not proof that the runtime layout works in-game.
 
 ## New live integration (untested in-game)
 
 - Hooked HUD initialization, update and draw; L1/R1 page changes when Triangle is held.
-- Temporary projection swaps the canonical 8 slots and HUD entry cache only within intercepted calls, guarded by a layout check; restores both afterwards.
+- Temporary projection swaps the canonical 8 slots and HUD entry cache only within intercepted calls, guarded by matching slot IDs **and icon definitions**; restores both afterwards.
 - Hooked pause editor load, update and store; L2/R2 switch editor pages to preserve the original L1/R1 cursor movement.
 - Hooked save preparation, restore and new game, with second-page data in per-save-slot files.
 - HUD page label through the 1.12+ API; Windows development-only Actions artifact workflow.
