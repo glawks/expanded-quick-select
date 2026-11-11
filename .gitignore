@@ -1,0 +1,9 @@
+/build/
+/.sdk/
+/dist/
+/.superpowers/
+*.o
+*.exe
+*.dll
+*.so
+*.dylib
