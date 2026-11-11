@@ -1,8 +1,16 @@
 #pragma once
 
 #include "expanded_quick_select/banks.hpp"
+#include <cstdint>
 
 namespace expanded_quick_select {
+
+// PAL and NTSC-U keep the active message-table pointer at different addresses.
+// The rest of the mod's generic -0x100 NTSC adjustment must not be used here.
+constexpr std::uint32_t help_message_pointer_address(bool ntsc) noexcept {
+    return ntsc ? 0x0015F6A0u : 0x0015F780u;
+}
+
 
 // The pause editor uses L2/R2 (the gameplay wheel uses L1/R1).
 // The game's own small menu font draws these at the foot of the ring panel.

@@ -55,6 +55,8 @@ int main() {
     assert(wheel.before_update(banks, true, false, false));
     assert(banks.active_page() == Page::Primary); // fresh wheel begins at page 1
 
+    assert(help_message_pointer_address(true) == 0x0015F6A0u);
+    assert(help_message_pointer_address(false) == 0x0015F780u);
     assert(std::string_view(editor_page_hint(Page::Primary)) ==
            "L2   PAGE 1 / 2   R2");
     assert(std::string_view(editor_page_hint(Page::Secondary)) ==

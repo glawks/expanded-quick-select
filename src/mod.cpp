@@ -19,11 +19,10 @@ constexpr openrac::gaddr kSavedSlots = 0x00141FA0;
 constexpr openrac::gaddr kPadState = 0x0013CA40;
 constexpr openrac::gaddr kHudEntries = 0x0017DBC0;
 constexpr openrac::gaddr kItemDefs = 0x00179BC0;
-// RAC1 executable globals: help message table, count, and a writable 80-byte
-// HUD text buffer (OpenRAC/rac1-decomp). Used only during a single menu draw.
-constexpr openrac::gaddr kHelpEntries = 0x0015F780;
+// PAL's help state count; the current runtime already reads this correctly.
+// The message-table POINTER has its own NTSC-U location; unlike many other
+// fields it cannot be obtained with the game's generic -0x100 shift.
 constexpr openrac::gaddr kHelpState = 0x001997D0;
-constexpr openrac::gaddr kHudMessageBuffer = 0x001994D8;
 constexpr std::uint32_t kTriangle = 0x10, kL1 = 0x04, kR1 = 0x08;
 constexpr std::uint32_t kL2 = 0x01, kR2 = 0x02;
 
@@ -232,40 +231,57 @@ public:
         }
         const auto mem = r.mod.memory();
 
-        // RAC1's help_msgs at 0x15F780 holds a POINTER to the current
-        // language's help-message entries, not the entries themselves.
-        // The pause menu swaps this pointer while loading its own text.
-        const auto table = mem.read<openrac::gaddr>(r.exe(kHelpEntries));
+        // Unlike most data in this mod, the help-message table pointer has
+        // different PAL and NTSC-U addresses, NOT a uniform -0x100 offset.
+        // NTSC-U's get_help_message_text explicitly reads D_0015F6A0.
+        const auto pointer_address = r.mod.relocate(
+            eqs::help_message_pointer_address(r.mod.version() == "ntsc"));
+        const auto table = mem.read<openrac::gaddr>(pointer_address);
         const auto count = mem.read<std::int32_t>(r.exe(kHelpState) + 0x2C);
         if (table < 0x10000 || table >= 0x2000000 || count <= 0 || count > 4096 ||
             static_cast<std::uint64_t>(table) + static_cast<std::uint64_t>(count) * 16u > 0x2000000) {
-            diagnostic = "message table invalid: ptr=" + std::to_string(table) +
-                         " count=" + std::to_string(count);
+            diagnostic = "message table invalid: slot=" + std::to_string(pointer_address) +
+                         " ptr=" + std::to_string(table) + " count=" + std::to_string(count);
             return;
         }
 
-        // Message IDs differ by language and version. v0.1.3 erroneously
-        // assumed one of the first 32 IDs would be in 0x4000..0x5FFF.
-        // Borrow the first real record whose original string points into
-        // game RAM. Do not modify the table until all checks have passed.
-        openrac::gaddr entry = 0;
-        std::int32_t message_id = 0;
-        openrac::gaddr pointer = 0;
-        for (int i = 0; i < count; ++i) {
-            const auto candidate = static_cast<openrac::gaddr>(table + i * 16);
-            const auto id = mem.read<std::int32_t>(candidate + 4);
-            const auto text_pointer = mem.read<openrac::gaddr>(candidate);
-            if (id > 0 && id < 65536 && text_pointer >= 0x10000 &&
-                text_pointer < 0x2000000) {
-                entry = candidate;
-                message_id = id;
-                pointer = text_pointer;
-                break;
-            }
+        const char* caption = eqs::editor_page_hint(r.editor.active_page());
+        const std::size_t caption_size = std::strlen(caption) + 1;
+        constexpr std::size_t kSavedBytes = 32;
+        if (caption_size > kSavedBytes) {
+            diagnostic = "footer caption exceeds temporary text space";
+            return;
         }
-        if (entry == 0) {
-            diagnostic = "no valid message record: ptr=" + std::to_string(table) +
-                         " count=" + std::to_string(count);
+
+        // Instead of relying on an unknown NTSC location for a HUD text
+        // buffer, borrow the bytes of one existing, sufficiently long help
+        // message only for this synchronous draw, then restore them.
+        // That message's table pointer is never modified.
+        openrac::gaddr found_text = 0;
+        std::int32_t found_id = 0;
+        std::array<std::uint8_t, kSavedBytes> original_text{};
+        for (int i = 0; i < count; ++i) {
+            const auto entry = static_cast<openrac::gaddr>(table + i * 16);
+            const auto id = mem.read<std::int32_t>(entry + 4);
+            const auto ptr = mem.read<openrac::gaddr>(entry);
+            if (id <= 0 || id >= 65536 || ptr < 0x10000 ||
+                static_cast<std::uint64_t>(ptr) + kSavedBytes >= 0x2000000) continue;
+            const auto sample = mem.read<std::array<std::uint8_t, kSavedBytes>>(ptr);
+            // The existing string must have enough space for all of the
+            // caption including the terminating NUL; no overwriting the
+            // neighbouring message's storage.
+            bool enough = true;
+            for (std::size_t j = 0; j + 1 < caption_size; ++j)
+                if (sample[j] == 0) { enough = false; break; }
+            if (!enough) continue;
+            found_text = ptr;
+            found_id = id;
+            original_text = sample;
+            break;
+        }
+        if (found_text == 0) {
+            diagnostic = "no message long enough for footer (count=" +
+                         std::to_string(count) + ")";
             return;
         }
 
@@ -278,38 +294,34 @@ public:
         }
 
         saved_screen = mem.read<std::array<std::uint8_t, 0x54>>(screen);
-        saved_text = mem.read<std::array<std::uint8_t, 80>>(r.exe(kHudMessageBuffer));
-        saved_pointer = pointer;
-        entry_address = entry;
-        active = true;
+        saved_message = original_text;
+        message_address = found_text;
+        active = true; // Every game-memory modification below is restored.
 
-        const char* caption = eqs::editor_page_hint(r.editor.active_page());
-        std::array<std::uint8_t, 80> text{};
-        std::memcpy(text.data(), caption, std::strlen(caption) + 1);
-        mem.write(r.exe(kHudMessageBuffer), text);
-        mem.write<openrac::gaddr>(entry, r.exe(kHudMessageBuffer));
+        auto substitute = original_text;
+        std::memcpy(substitute.data(), caption, caption_size);
+        mem.write(found_text, substitute);
 
-        // Render through RAC1's small menu font. Using a temporary
-        // label description avoids changing the static menu definition.
+        // Reuse the game's small menu text renderer, instead of the HUD
+        // overlay (which OpenRAC intentionally draws behind pause menus).
         constexpr std::int32_t kLabelFlags = 0x2000 | 0x10 | 0x04 | 0x01;
         mem.write<std::int32_t>(screen + 0x30, kLabelFlags);
-        mem.write<std::int32_t>(screen + 0x34, message_id);
+        mem.write<std::int32_t>(screen + 0x34, found_id);
         mem.write<std::uint32_t>(screen + 0x38, 0);
         mem.write<std::int32_t>(screen + 0x3C, eqs::editor_label_scroll_16ths(height));
         mem.write<std::int32_t>(screen + 0x44, 0x100);
         mem.write<std::int32_t>(screen + 0x48, 0);
         mem.write<std::int32_t>(screen + 0x4C, 0);
 
-        diagnostic = "native draw reached, message ID " + std::to_string(message_id) +
-                     ", panel " + std::to_string(width) + "x" +
-                     std::to_string(height);
+        diagnostic = "native draw reached, message ID " + std::to_string(found_id) +
+                     ", panel " + std::to_string(width) + "x" + std::to_string(height);
     }
+
     ~ScopedEditorHint() {
         if (!active) return;
         const auto mem = state.mod.memory();
         mem.write(screen_address, saved_screen);
-        mem.write(state.exe(kHudMessageBuffer), saved_text);
-        mem.write<openrac::gaddr>(entry_address, saved_pointer);
+        mem.write(message_address, saved_message);
     }
     bool ready() const noexcept { return active; }
     const std::string& outcome() const noexcept { return diagnostic; }
@@ -318,10 +330,9 @@ public:
 private:
     Runtime& state;
     openrac::gaddr screen_address;
-    openrac::gaddr entry_address = 0;
-    openrac::gaddr saved_pointer = 0;
+    openrac::gaddr message_address = 0;
     std::array<std::uint8_t, 0x54> saved_screen{};
-    std::array<std::uint8_t, 80> saved_text{};
+    std::array<std::uint8_t, 32> saved_message{};
     std::string diagnostic{"not attempted"};
     bool active = false;
 };

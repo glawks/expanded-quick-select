@@ -87,3 +87,12 @@ This is an **experimental hook implementation**. The user confirmed the wheel wo
 - Corrected the overly restrictive help-message ID filter (first 32 entries with IDs 0x4000..0x5FFF); now select the first plausible message record in the active language table. The `help_msgs` global is indeed a pointer, not an inline table.
 - The footer logs each stage once or on state changes (editor opened, native font callback seen, missing font, message-table/record issue, viewport dimensions or attempted native draw).
 - No changes to existing gameplay selection, jump input or save logic. Still awaiting in-game rendering check.
+
+## v0.1.5 — NTSC-U message-table address fix (not yet verified in-game)
+
+- User's v0.1.4 log: `Quick Select footer: editor opened` and `message table invalid: ptr=0 count=1515`.
+- Verified NTSC-U's `get_help_message_text` reads pointer at `D_0015F6A0`; the -0x100 PAL adjustment read `0x0015F680`, which is not that pointer.
+- Use explicit PAL `0x0015F780` / NTSC `0x0015F6A0` address selector and preserve `mod.relocate` semantics.
+- No longer borrow an unverified HUD text buffer. During a draw, temporarily replace a sufficiently long existing help message with the footer and restore its original bytes immediately afterward.
+- Gameplay wheel, pad history fix, saves and page changing unchanged.
+- Logs now include message pointer slot, pointer and count if lookup fails, or a native draw attempt.
