@@ -2,5 +2,5 @@
 
 namespace expanded_quick_select {
 inline constexpr char kModId[] = "expanded-quick-select";
-inline constexpr char kModVersion[] = "0.1.0";
+inline constexpr char kModVersion[] = "0.1.1";
 }

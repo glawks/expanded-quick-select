@@ -2,7 +2,7 @@
 
 A standalone Ratchet & Clank 1 OpenRAC mod intended to provide two independently editable eight-slot Quick Select pages, switched using L1/R1 while holding Triangle.
 
-**Experimental development build.** The game hooks and second-page editor are wired in, but the live mod is **not yet verified in-game**. Make a backup of your save before testing, and expect possible missing icons, UI glitches or crashes. This is not a stable launcher release.
+**Experimental development build.** The wheel and second-page editor have been successfully tried in-game; the R1/Thruster-Pack input-consumption fix is still awaiting player verification. Make a backup of your save before testing, and expect possible missing icons, UI glitches or crashes. This is not a stable launcher release.
 
 The existing Weapon Wheel Pause mod is not part of this repository and remains untouched.
 
@@ -12,7 +12,7 @@ The native build requires the official OpenRAC Mod SDK (1.14.5 pinned here), CMa
 
 ### Testing controls
 
-- Gameplay: hold **Triangle** to open Quick Select; press **L1 or R1** to switch between eight-slot pages. The wheel starts on page 1 each time it opens.
+- Gameplay: hold **Triangle** to open Quick Select; press **L1 or R1** to switch between eight-slot pages. The wheel starts on page 1 each time it opens. In v0.1.1, shoulder presses while Triangle is held are consumed by the wheel rather than being interpreted as a gameplay attack or Thruster-Pack action.
 - Pause-menu Quick Select editor: **L2/R2** switch pages. **L1/R1** keep their original slot-selection behaviour, and **Cross** assigns an item to the visible page.
 - Page 1 remains stored by the game. Page 2 uses a separate file under OpenRAC's mod data folder, one for each memory-card save slot.
 - The HUD displays `PAGE 1 / 2` or `PAGE 2 / 2` while Triangle is held. The pause editor does not yet show a page-number label.
@@ -36,5 +36,6 @@ Without CMake, the dependency-free logic tests can also be run on Linux/macOS wi
 - [x] Versioned, validated, per-save-slot secondary-page storage (core only)
 - [x] Development hooks for the gameplay wheel and pause-menu editor
 - [x] Save/restore entry points and guarded secondary-page persistence
-- [ ] Real SDK build confirmation and in-game test on a backed-up save
+- [x] SDK compilation and initial in-game wheel/editor test
+- [ ] Verify v0.1.1 R1 suppression while jumping with the wheel open
 - [x] Windows development artifact workflow (no public release)

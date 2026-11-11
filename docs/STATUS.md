@@ -1,6 +1,6 @@
 # Expanded Quick Select — rebuild checkpoint (2026-11-11)
 
-This is an **experimental hook implementation awaiting a real SDK build and in-game tests**.
+This is an **experimental hook implementation**. The user confirmed the wheel works almost flawlessly in-game; the one reported issue is R1 switching pages during an airborne jump also causing a Thruster-Pack slam.
 
 ## Recovered and preserved decisions
 
@@ -48,3 +48,10 @@ This is an **experimental hook implementation awaiting a real SDK build and in-g
 - The `SlotStore` validates item IDs 0–39 and save-slot numbers 0–127; live card-slot numbering still needs verification.
 - Overlay symbol addresses come from the PAL level-zero decomp and the NTSC -0x100 shift is **not yet verified** for all overlay symbols. The HUD table is checked before writes, but testing on a backed-up save is essential.
 - Win32 `MoveFileExW` and POSIX rename are used for replacement; test actual Windows file replacement before trusting persistence on a player's save.
+
+## v0.1.1: wheel-only shoulder input consumption
+
+- A gameplay-scoped Hero_Update hook masks L1/R1 in the gameplay-facing held/pressed/raw button fields when Triangle is held. The weapon wheel still reads held_unmasked, so L1/R1 page navigation remains available.
+- The original bits are restored after the hero update, avoiding changes to gameplay actions outside Quick Select.
+- Source-level tests cover Triangle-on/off, both shoulders, and unrelated buttons.
+- Runtime behaviour with and without Weapon Wheel Pause must be tested in-game; no claims are made about its correctness before this test.

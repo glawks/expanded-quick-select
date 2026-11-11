@@ -1,4 +1,5 @@
 #include "expanded_quick_select/identity.hpp"
+#include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
 #include "openrac/games/rac1.hpp"
@@ -152,6 +153,49 @@ private:
     bool active = false;
 };
 
+// The gameplay action handler (including the Thruster-Pack R1 action) reads
+// g_controller_state.held / pressed. Only mask those gameplay-facing fields
+// during Hero_Update; the Quick Select hook still reads held_unmasked, so
+// page switching continues to work. Restore exactly the shoulder bits after
+// the hero finishes updating, without losing changes to unrelated buttons.
+class ScopedHeroShoulderFilter {
+public:
+    explicit ScopedHeroShoulderFilter(Runtime& r) : state(r) {
+        const auto pad = r.exe(kPadState);
+        mask = eqs::gameplay_shoulder_mask(
+            r.mod.memory().read<std::uint32_t>(pad + 0x1C0));
+        if (mask == 0) return;
+        for (std::size_t i = 0; i < kOffsets.size(); ++i) {
+            const auto address = pad + kOffsets[i];
+            const auto current = state.mod.memory().read<std::uint32_t>(address);
+            saved[i] = current & mask;
+            state.mod.memory().write<std::uint32_t>(
+                address, eqs::filtered_gameplay_buttons(current, mask));
+        }
+    }
+    ~ScopedHeroShoulderFilter() {
+        if (mask == 0) return;
+        const auto pad = state.exe(kPadState);
+        for (std::size_t i = 0; i < kOffsets.size(); ++i) {
+            const auto address = pad + kOffsets[i];
+            const auto current = state.mod.memory().read<std::uint32_t>(address);
+            state.mod.memory().write<std::uint32_t>(
+                address, (current & ~mask) | saved[i]);
+        }
+    }
+    ScopedHeroShoulderFilter(const ScopedHeroShoulderFilter&) = delete;
+    ScopedHeroShoulderFilter& operator=(const ScopedHeroShoulderFilter&) = delete;
+
+private:
+    // held, pressed, raw_held, raw_pressed from RAC1 PadState.
+    static constexpr std::array<openrac::gaddr, 4> kOffsets{
+        0x1A0, 0x1A4, 0x1B0, 0x1B4
+    };
+    Runtime& state;
+    std::uint32_t mask = 0;
+    std::array<std::uint32_t, kOffsets.size()> saved{};
+};
+
 std::unique_ptr<Runtime> runtime;
 
 void load(openrac::Mod& mod) {
@@ -161,6 +205,11 @@ void load(openrac::Mod& mod) {
         throw openrac::Error("Expanded Quick Select requires OpenRAC mod API 1.12+");
     runtime = std::make_unique<Runtime>(mod);
     Runtime& r = *runtime;
+
+    mod.hook<openrac::rac1::Hero_Update>([&r](auto original) {
+        ScopedHeroShoulderFilter filter(r);
+        original();
+    });
 
     mod.hook<openrac::rac1::Hud_QuickSelect_Init>([&r](auto original, std::uint32_t selector) {
         original(selector);

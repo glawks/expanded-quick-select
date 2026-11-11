@@ -1,4 +1,5 @@
 #include "expanded_quick_select/sessions.hpp"
+#include "expanded_quick_select/input_filter.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -8,6 +9,18 @@
 using namespace expanded_quick_select;
 
 int main() {
+    // R1/L1 used to turn wheel pages must not reach hero actions (R1 slam).
+    // Gameplay inputs are unchanged as soon as Triangle is released.
+    assert(gameplay_shoulder_mask(0x00) == 0);
+    assert(gameplay_shoulder_mask(0x08) == 0); // R1 without Triangle: normal slam
+    assert(gameplay_shoulder_mask(0x10) == 0x0C);
+    assert(gameplay_shoulder_mask(0x18) == 0x0C);
+    assert(gameplay_shoulder_mask(0x14) == 0x0C);
+    assert(filtered_gameplay_buttons(0x18, gameplay_shoulder_mask(0x18)) == 0x10);
+    assert(filtered_gameplay_buttons(0x1C, gameplay_shoulder_mask(0x1C)) == 0x10);
+    assert(filtered_gameplay_buttons(0x48, gameplay_shoulder_mask(0x48)) == 0x48);
+    assert(filtered_gameplay_buttons(0x08, gameplay_shoulder_mask(0x08)) == 0x08);
+
     const Slots first{{1, 2, 3, 4, 5, 6, 7, 8}};
     const Slots second{{9, 10, 11, 12, 13, 14, 15, 16}};
     Banks banks(first);
