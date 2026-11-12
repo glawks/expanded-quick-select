@@ -1,6 +1,7 @@
 # Build/verify the same source on five desktop platforms.
-# Pushes to development/main build test artifacts only; a matching vX.Y.Z
-# tag additionally publishes the verified ZIPs and SHA256SUMS as a release.
+# Pushes to development/main build test artifacts. A matching vX.Y.Z tag
+# publishes the verified ZIPs; an explicitly named main release commit may
+# create the matching tag and publish in its verified run.
 # Based on OpenRAC's pinned Mod SDK build/release workflow.
 name: Cross-platform build and release
 
@@ -161,12 +162,14 @@ jobs:
             dist/SHA256SUMS
           if-no-files-found: error
 
-  # Only a version tag creates/updates GitHub Releases. Normal pushes to
-  # development/main and manual workflow runs remain test-only.
+  # A tag publishes the release. An explicit main commit with subject
+  # "release: publish vX.Y.Z" may create that tag and publish in the same
+  # run, since tags pushed with GITHUB_TOKEN don't trigger another workflow.
+  # All other main/development pushes remain build-only.
   release:
     name: Publish verified GitHub Release
     needs: merge
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && needs.merge.result == 'success' }}
+    if: ${{ needs.merge.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: publish v'))) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -179,15 +182,53 @@ jobs:
         with:
           name: expanded-quick-select-all-platforms-test
           path: dist
+      - name: Check explicit release intent and resolve version tag
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
+          tag="v$version"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          elif [[ "$GITHUB_REF" == refs/heads/main ]]; then
+            subject=$(git log -1 --pretty=%s)
+            if [[ "$subject" != "release: publish $tag" ]]; then
+              echo "::error::The release commit subject must be exactly 'release: publish $tag'"
+              exit 1
+            fi
+          else
+            echo "::error::Unexpected release ref $GITHUB_REF"
+            exit 1
+          fi
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
       - name: Verify tag, combined mod and hashes before publishing
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
         run: python3 tools/verify_release.py --tag "$RELEASE_TAG" --dist dist
+      - name: Create matching tag for explicit main release commit
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # If an earlier attempt created the lightweight tag, permit a
+          # retry only when it points to this exact verified commit.
+          existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)
+          if [[ -n "$existing" ]]; then
+            if [[ "$existing" != "$GITHUB_SHA" ]]; then
+              echo "::error::$RELEASE_TAG already points to $existing, not $GITHUB_SHA"
+              exit 1
+            fi
+            echo "Existing $RELEASE_TAG already points to this verified commit"
+          else
+            gh api --method POST "repos/$GH_REPO/git/refs" \
+              -f "ref=refs/tags/$RELEASE_TAG" \
+              -f "sha=$GITHUB_SHA" \
+              --silent
+            echo "Created $RELEASE_TAG at $GITHUB_SHA"
+          fi
       - name: Create release and upload checked ZIPs
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 - <<'PY'
           import json

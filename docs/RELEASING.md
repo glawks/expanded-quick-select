@@ -15,27 +15,29 @@ individual platform ZIPs plus one combined installable ZIP and SHA256SUMS.
 4. Run the development CI workflow. Verify all five builds, core tests,
    the merged ZIP, and SHA256SUMS pass.
 5. Merge `development` into **`main`** and ensure main's CI passes.
-6. Tag the tested **main** commit. For the first full release:
-
-   ```sh
-   git switch main
-   git pull --ff-only
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-
-   Do **not** push `v1.0.0` while the manifest still says `0.2.0`;
-   the publishing workflow will reject any tag/version mismatch.
+6. Publish one of two ways:
+   - **From a local checkout:** tag the tested main commit with
+     `git tag v1.0.0`, then run `git push origin v1.0.0`.
+   - **From GitHub Actions:** create a new commit on main with the exact
+     subject `release: publish v1.0.0`. The release job runs the full build
+     checks, creates `v1.0.0` on that verified commit, and publishes the
+     release. Ordinary commits do not trigger publication. This works
+     despite GitHub suppressing tag-triggered workflows for tags created
+     with its built-in `GITHUB_TOKEN`.
+   Keep the version in the manifest and the compiled code consistent with
+   the intended tag; mismatches fail verification.
 7. Open **GitHub → Actions → Cross-platform build and release**. On the tag
-   run, check that the five builds and merged package validation pass and
-   that **Publish verified GitHub Release** succeeds.
+   or explicit main release-commit run, check that the five builds and merged
+   package validation pass and that **Publish verified GitHub Release**
+   succeeds.
 8. Open GitHub Releases and verify the release has:
    - `expanded-quick-select-VERSION.zip` (combined installer)
    - Five `expanded-quick-select-VERSION-PLATFORM.zip` archives
    - `SHA256SUMS` listing all six ZIPs.
 
-The release workflow starts on a pushed `vX.Y.Z` or `vX.Y.Z-suffix` tag.
-Normal pushes and manual workflow runs **only** produce Actions artifacts.
+The release workflow starts on a pushed `vX.Y.Z` or `vX.Y.Z-suffix` tag,
+or an exact matching `release: publish vX.Y.Z` commit on main. Other pushes
+and manual workflow runs **only** produce Actions artifacts.
 A release requires a successful merge job, matching tag/manifest versions,
 a combined ZIP containing all five platform libraries, the expected MIT
 licence, and matching SHA-256 hashes. Release notes are generated automatically.
@@ -54,6 +56,6 @@ Do not describe compilation alone as confirmed gameplay compatibility.
 
 ## Visibility
 
-This repository is currently private. A GitHub Release on a private
-repository is **not publicly available**. Make the repository public when
-you're ready for players to download or install the mod via its URL.
+The repository is public. A published GitHub Release is accessible to
+players, and OpenRAC can install from the repository URL once its release
+assets and SHA256SUMS are available.
