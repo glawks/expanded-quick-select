@@ -70,5 +70,6 @@
       ],
       "description": "Number of Quick Select pages (1-8). Restart the game after changing."
     }
-  ]
+  ],
+  "license": "MIT"
 }
