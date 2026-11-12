@@ -19,7 +19,7 @@ The number of wheels is adjustable in the OpenRAC launcher, with **two wheels en
 
 You need **OpenRAC with Ratchet & Clank 1** (PAL or NTSC-U) and a build supporting the OpenRAC native mod API **1.12 or later**.
 
-1. Download the **combined mod ZIP** from this repository's [GitHub Releases](https://github.com/glawks/expanded-quick-select/releases) once a release has been published.
+1. Download the **combined mod ZIP** from this repository's [GitHub Releases](https://github.com/glawks/expanded-quick-select/releases) when a release is available.
 2. Open the **OpenRAC Launcher → Mods** tab.
 3. Add or install the downloaded mod ZIP and enable **Expanded Quick Select**.
 4. Start Ratchet & Clank 1.
@@ -117,4 +117,4 @@ ctest --test-dir build --output-on-failure
 
 To build the native mod, fetch the SDK with `python tools/fetch_sdk.py`, then configure with `-DBUILD_OPENRAC_MOD=ON`. On Linux/macOS, `bash scripts/test-local.sh` also runs the dependency-free core tests.
 
-Development builds and cross-platform packages are available as artifacts from the repository's **Actions** tab. Those are test builds, not official GitHub Releases.
+Development builds and cross-platform packages are available as artifacts from the repository's **Actions** tab; these are test builds rather than official GitHub Releases. Version-tagged releases are automatically built, verified and published by GitHub Actions.

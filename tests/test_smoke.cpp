@@ -9,5 +9,5 @@
 int main() {
     using namespace expanded_quick_select;
     assert(std::string_view(kModId) == "expanded-quick-select");
-    assert(std::string_view(kModVersion) == "0.2.0");
+    assert(std::string_view(kModVersion) == "1.0.0");
 }
