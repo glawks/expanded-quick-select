@@ -32,6 +32,15 @@ def verify(tag: str, dist: Path, root: Path) -> None:
         raise ValueError("Expected MIT licence in openrac-mod.json")
     if manifest.get("id") != MOD_ID:
         raise ValueError(f"Unexpected mod ID: {manifest.get('id')!r}")
+    # The SDK packages the JSON independently of the DLL/SO/DYLIB version
+    # reported by OPENRAC_MOD_CPP; both must agree or OpenRAC won't load it.
+    identity = (root / "include/expanded_quick_select/identity.hpp").read_text(
+        encoding="utf-8"
+    )
+    declared = re.search(r'kModVersion\[\]\s*=\s*"([^"]+)"', identity)
+    if not declared or declared.group(1) != version:
+        raise ValueError(f"Compiled mod version {declared.group(1) if declared else None!r} "
+                         f"does not match manifest version {version!r}")
     if not (root / "LICENSE").is_file():
         raise ValueError("Root LICENSE file missing")
 

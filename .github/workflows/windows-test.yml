@@ -189,21 +189,30 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          version=$(python3 -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
-          sdk=$(python3 -c 'import json; print(json.load(open("sdk.lock"))["version"])')
-          cat > release-notes.md <<EOF
-          ## Expanded Quick Select $RELEASE_TAG
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          version = json.loads(Path("openrac-mod.json").read_text())["version"]
+          sdk = json.loads(Path("sdk.lock").read_text())["version"]
+          tag = os.environ["RELEASE_TAG"]
+          sha = os.environ["GITHUB_SHA"]
+          notes = f"""## Expanded Quick Select {tag}
 
           Add 1–8 configurable eight-slot Quick Select wheels to Ratchet & Clank 1 in OpenRAC.
 
-          **Install:** Add the combined `expanded-quick-select-$version.zip` to the OpenRAC launcher's Mods tab, or install from this repository URL.
+          **Install:** Add the combined `expanded-quick-select-{version}.zip` to the OpenRAC launcher's Mods tab, or install from this repository URL.
 
           **Controls:** Hold Triangle and press L1/R1 to switch wheels. In the pause-menu Quick Select editor, use L2/R2. Choose 1–8 wheels in the mod's launcher settings (default: 2).
 
           **Compatibility:** Windows NTSC-U was tested in-game. PAL and Linux/macOS runtime behaviour still need testing; all five desktop library builds passed automated checks.
 
-          This release was built from commit `$GITHUB_SHA` with OpenRAC Mod SDK `$sdk`. The archives and `SHA256SUMS` are produced automatically by the official SDK packaging tools.
-          EOF
+          This release was built from commit `{sha}` with OpenRAC Mod SDK `{sdk}`. The archives and `SHA256SUMS` are produced automatically by the official SDK packaging tools.
+          """
+          Path("release-notes.md").write_text(notes, encoding="utf-8")
+          PY
+          version=$(python3 -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
           # A rerun may upload rebuilt assets for the same tag, but never
           # creates a second release or publishes a different version.
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
