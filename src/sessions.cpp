@@ -30,15 +30,18 @@ const Slots& EditorSession::visible_slots(const Banks& banks) const noexcept {
 
 void EditorSession::capture(Banks& banks, const Slots& slots) noexcept {
     if (!active_ || !valid_game_slots(slots)) return;
-    if (page_ == Page::Primary) banks.set_primary(slots);
-    else banks.set_secondary(slots);
+    banks.set_page(page_, slots);
 }
 
 bool EditorSession::switch_page(Banks& banks, bool l2_pressed,
                                 bool r2_pressed, const Slots& visible) noexcept {
-    if (!active_ || l2_pressed == r2_pressed) return false;
+    if (!active_ || banks.page_count() <= 1 || l2_pressed == r2_pressed)
+        return false;
     capture(banks, visible);
-    page_ = page_ == Page::Primary ? Page::Secondary : Page::Primary;
+    const auto index = page_index(page_);
+    const auto count = banks.page_count();
+    page_ = page_at(l2_pressed ? (index + count - 1) % count
+                              : (index + 1) % count);
     return true;
 }
 

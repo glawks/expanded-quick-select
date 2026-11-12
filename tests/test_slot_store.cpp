@@ -10,6 +10,7 @@
 #include <string>
 
 using expanded_quick_select::SlotStore;
+using expanded_quick_select::Page;
 using expanded_quick_select::Slots;
 namespace fs = std::filesystem;
 
@@ -54,6 +55,29 @@ int main() {
     }
     assert(!store.load(0).has_value());
     assert(store.load(1).value() == page_b);
+
+    // Additional wheels have independent sidecars. Existing page-2 data
+    // must keep its original save-slot-N.dat filename and encoding.
+    assert(!store.load(0, Page::Third).has_value());
+    assert(!store.save(0, Page::Primary, page_a));
+    assert(!store.save(0, static_cast<Page>(8), page_a));
+    assert(!store.load(0, Page::Primary).has_value());
+    assert(store.save(0, Page::Secondary, page_a));
+    assert(store.save(0, Page::Third, page_b));
+    assert(store.save(0, Page::Eighth, page_a));
+    assert(store.save(1, Page::Third, page_a));
+    assert(store.load(0).value() == page_a);
+    assert(store.load(0, Page::Secondary).value() == page_a);
+    assert(store.load(0, Page::Third).value() == page_b);
+    assert(store.load(0, Page::Eighth).value() == page_a);
+    assert(store.load(1, Page::Third).value() == page_a);
+    assert(fs::exists(dir / "mod-data" / "save-slot-0.dat"));
+    assert(fs::exists(dir / "mod-data" / "save-slot-0-page-3.dat"));
+    assert(fs::exists(dir / "mod-data" / "save-slot-0-page-8.dat"));
+    // Pretend the player lowered the count and only saved page 2.
+    assert(store.save(0, Page::Secondary, page_b));
+    assert(store.load(0, Page::Third).value() == page_b);
+    assert(store.load(0, Page::Eighth).value() == page_a);
 
     // Invalid item IDs and an unwritable target cannot replace good data.
     const Slots invalid{{1, 2, 3, -1, 5, 6, 7, 8}};

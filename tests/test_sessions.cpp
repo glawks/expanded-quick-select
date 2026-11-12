@@ -78,6 +78,8 @@ int main() {
            "L2   PAGE 2 / 2   R2");
     assert(editor_label_scroll_16ths(200) == -172 * 16);
     assert(editor_label_scroll_16ths(32) == 0);
+    assert(editor_page_hint(Page::Third, 4) == "L2   PAGE 3 / 4   R2");
+    assert(editor_page_hint(Page::Eighth, 8) == "L2   PAGE 8 / 8   R2");
 
     EditorSession editor;
     editor.begin(banks);
@@ -99,6 +101,33 @@ int main() {
     assert(editor.active_page() == Page::Primary);
     editor.end();
     assert(!editor.active());
+
+    // With 4 wheels, editor L2 goes backward and R2 forward, wrapping.
+    Banks expanded(first);
+    expanded.set_page_count(4);
+    expanded.set_page(Page::Fourth, second);
+    editor.begin(expanded);
+    assert(editor.switch_page(expanded, true, false, first));
+    assert(editor.active_page() == Page::Fourth);
+    assert(editor.visible_slots(expanded) == second);
+    const Slots revised_fourth{{30, 31, 32, 33, 34, 35, 36, 37}};
+    assert(editor.switch_page(expanded, false, true, revised_fourth));
+    assert(expanded.slots(Page::Fourth) == revised_fourth);
+    assert(editor.active_page() == Page::Primary);
+    assert(editor.switch_page(expanded, false, true, first));
+    assert(editor.active_page() == Page::Secondary);
+    assert(editor.switch_page(expanded, false, true, second));
+    assert(editor.active_page() == Page::Third);
+    assert(editor.switch_page(expanded, false, true, Slots{}));
+    assert(editor.active_page() == Page::Fourth);
+    assert(editor_page_hint(editor.active_page(), expanded.page_count()) ==
+           "L2   PAGE 4 / 4   R2");
+    editor.end();
+    expanded.set_page_count(1);
+    editor.begin(expanded);
+    assert(!editor.switch_page(expanded, false, true, first));
+    assert(editor.active_page() == Page::Primary);
+    editor.end();
 
     assert(valid_game_slots(first));
     assert(!valid_game_slots(Slots{{1, 2, 3, 4, 40, 6, 7, 8}}));

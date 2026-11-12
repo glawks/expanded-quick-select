@@ -35,7 +35,13 @@ static_assert(sizeof(HudEntry) == 28, "RAC1 HUD entry layout changed");
 
 struct Runtime {
     explicit Runtime(openrac::Mod& m)
-        : mod(m), store(m.data_dir()), shift(m.version() == "ntsc" ? -0x100 : 0) {}
+        : mod(m), store(m.data_dir()), shift(m.version() == "ntsc" ? -0x100 : 0) {
+        const auto count = m.setting<std::string>("wheel_count");
+        // The launcher validates choice values; retain an older-mod
+        // fallback in case of a manually edited settings file.
+        banks.set_page_count(count.size() == 1 && count[0] >= '1' && count[0] <= '8'
+                                 ? static_cast<std::size_t>(count[0] - '0') : 2);
+    }
     openrac::Mod& mod;
     eqs::SlotStore store;
     eqs::Banks banks;
@@ -76,13 +82,24 @@ struct Runtime {
         const int slot = mod.save_slot_current();
         if (last_save_slot == slot) return;
         last_save_slot = slot;
-        banks.set_secondary(store.load(slot).value_or(eqs::Slots{}));
+        for (std::size_t page = 1; page < eqs::kMaxPages; ++page) {
+            const auto p = eqs::page_at(page);
+            banks.set_page(p, store.load(slot, p).value_or(eqs::Slots{}));
+        }
         refresh_primary();
     }
-    void save_page_two() {
+    void save_extra_pages() {
         const int slot = mod.save_slot_current();
-        if (slot >= 0 && !store.save(slot, banks.slots(eqs::Page::Secondary)))
-            mod.warn("Could not persist second page for save " + std::to_string(slot));
+        if (slot >= 0) {
+            // Never overwrite hidden pages when the player temporarily
+            // reduces the setting from (say) 6 wheels to 2.
+            for (std::size_t page = 1; page < banks.page_count(); ++page) {
+                const auto p = eqs::page_at(page);
+                if (!store.save(slot, p, banks.slots(p)))
+                    mod.warn("Could not persist page " + std::to_string(page + 1) +
+                             " for save " + std::to_string(slot));
+            }
+        }
         last_save_slot = slot;
     }
     void label(bool visible) {
@@ -90,8 +107,11 @@ struct Runtime {
         label_visible = visible;
         if (!visible) { mod.hud_text_set({}); return; }
         openrac_hud_text text{};
-        const char* message = banks.active_page() == eqs::Page::Primary ? "PAGE 1 / 2" : "PAGE 2 / 2";
-        std::memcpy(text.text, message, std::strlen(message) + 1);
+        const std::string message = "PAGE " +
+            std::to_string(eqs::page_index(banks.active_page()) + 1) +
+            " / " + std::to_string(banks.page_count());
+        if (message.size() + 1 > sizeof(text.text)) return;
+        std::memcpy(text.text, message.c_str(), message.size() + 1);
         text.x = 0.5f;
         text.y = 0.81f;
         text.scale = 0.62f;
@@ -115,8 +135,8 @@ struct Runtime {
 class Projection {
 public:
     explicit Projection(Runtime& r) : state(r) {
-        if (r.banks.active_page() != eqs::Page::Secondary) return;
-        const auto second = r.banks.slots(eqs::Page::Secondary);
+        if (r.banks.active_page() == eqs::Page::Primary) return;
+        const auto second = r.banks.slots(r.banks.active_page());
         if (!eqs::valid_game_slots(second)) return;
         slots_address = r.exe(kSavedSlots);
         cache_address = r.overlay(kHudEntries);
@@ -246,8 +266,9 @@ public:
             return;
         }
 
-        const char* caption = eqs::editor_page_hint(r.editor.active_page());
-        const std::size_t caption_size = std::strlen(caption) + 1;
+        const std::string caption =
+            eqs::editor_page_hint(r.editor.active_page(), r.banks.page_count());
+        const std::size_t caption_size = caption.size() + 1;
         constexpr std::size_t kSavedBytes = 32;
         if (caption_size > kSavedBytes) {
             diagnostic = "footer caption exceeds temporary text space";
@@ -300,7 +321,7 @@ public:
         active = true; // Every game-memory modification below is restored.
 
         auto substitute = original_text;
-        std::memcpy(substitute.data(), caption, caption_size);
+        std::memcpy(substitute.data(), caption.c_str(), caption_size);
         mem.write(found_text, substitute);
 
         // Reuse the game's small menu text renderer, instead of the HUD
@@ -474,14 +495,14 @@ void load(openrac::Mod& mod) {
         if (!r.editor.active() || r.editor_address != page) return original(page);
         r.editor.capture(r.banks, r.read(page + 0x30));
         r.write(r.exe(kSavedSlots), r.banks.slots(eqs::Page::Primary));
-        r.save_page_two();
+        r.save_extra_pages();
         r.editor.end();
         r.editor_address = 0;
         return std::int32_t{0};
     });
     mod.hook<openrac::rac1::Save_Prepare>([&r](auto original, std::int32_t a, std::int32_t b) {
         original(a, b);
-        r.save_page_two();
+        r.save_extra_pages();
     });
     mod.hook<openrac::rac1::Save_Restore>([&r](auto original, std::uint32_t arg) {
         original(arg);
@@ -491,7 +512,8 @@ void load(openrac::Mod& mod) {
         original();
         r.reset(true);
     });
-    mod.info("Expanded Quick Select dev hooks enabled: L1/R1 wheel; L2/R2 pause editor");
+    mod.info("Expanded Quick Select: " + std::to_string(r.banks.page_count()) +
+             " wheel(s); L1/R1 gameplay, L2/R2 pause editor");
 }
 } // namespace
 

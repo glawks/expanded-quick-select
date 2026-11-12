@@ -114,3 +114,18 @@ This is an **experimental hook implementation**. The user confirmed the wheel wo
 - Page-2 storage already exists under the mod's data_dir; no changes to the
   established save format or slot-mapping were made.
 - **In-game verification required**, especially with the pause mod enabled.
+
+## v0.2.0: variable wheel count (unverified in-game)
+
+- Launcher `wheel_count` choice setting, 1–8, default 2; applied on game start.
+- Generalised Banks to eight pages with directional wrap-around for L1/R1.
+  Page count can drop and rise without clearing hidden assignments.
+- Pause editor L2/R2 is directional, using the same configured count.
+- Page indicators in both gameplay and pause editor display `PAGE X / Y`.
+- Extra pages use per-save-slot sidecars: page 2 retains the unchanged
+  `save-slot-N.dat` v0.1.6 format and pages 3–8 have separate
+  `save-slot-N-page-M.dat` files. Hidden pages are not overwritten on save.
+- Added unit tests for count 1, directional page navigation, wrap, hidden
+  page retention, editor movement, and sidecar migration compatibility.
+- Gameplay input filtering and native rendering hooks are otherwise unchanged.
+- **In-game tests on NTSC-U (and ultimately PAL) still required.**

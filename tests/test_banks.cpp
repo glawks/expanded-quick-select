@@ -61,4 +61,60 @@ int main() {
     assert(banks.slots(Page::Primary) == new_game);
     assert(banks.slots(Page::Secondary) == Slots{});
     assert(banks.active_page() == Page::Primary);
+
+    // Wheel count setting: 1 disables page switching, 3+ steps in direction.
+    assert(banks.page_count() == 2); // backwards-compatible default
+    banks.set_page_count(1);
+    banks.open_wheel();
+    banks.switch_on_press(false, false);
+    assert(!banks.switch_on_press(false, true));
+    assert(banks.active_page() == Page::Primary);
+    banks.close_wheel();
+    banks.switch_on_press(false, false);
+
+    banks.set_page_count(3);
+    assert(banks.page_count() == 3);
+    const Slots third{{31, 32, 33, 0, 0, 0, 0, 0}};
+    banks.set_page(Page::Third, third);
+    banks.open_wheel();
+    assert(banks.switch_on_press(false, true));
+    assert(banks.active_page() == Page::Secondary);
+    assert(!banks.switch_on_press(false, true));
+    banks.switch_on_press(false, false);
+    assert(banks.switch_on_press(false, true));
+    assert(banks.active_page() == Page::Third);
+    assert(banks.slots(Page::Third) == third);
+    banks.switch_on_press(false, false);
+    assert(banks.switch_on_press(false, true)); // wrap 3 -> 1
+    assert(banks.active_page() == Page::Primary);
+    banks.switch_on_press(false, false);
+    assert(banks.switch_on_press(true, false)); // reverse 1 -> 3
+    assert(banks.active_page() == Page::Third);
+    assert(!banks.switch_on_press(true, false));
+    banks.close_wheel();
+
+    // Reducing wheels must preserve hidden page assignments.
+    banks.set_page_count(2);
+    assert(banks.active_page() == Page::Primary);
+    assert(banks.slots(Page::Third) == third);
+    banks.set_page_count(3);
+    assert(banks.slots(Page::Third) == third);
+    banks.set_page_count(8);
+    assert(banks.page_count() == 8);
+    const Slots eighth{{7, 7, 7, 7, 7, 7, 7, 7}};
+    banks.set_page(Page::Eighth, eighth);
+    banks.switch_on_press(false, false);
+    banks.open_wheel();
+    assert(banks.switch_on_press(true, false)); // 1 -> 8
+    assert(banks.active_page() == Page::Eighth);
+    assert(banks.slots(Page::Eighth) == eighth);
+    assert(!banks.set_slot(Page::Eighth, 8, 1));
+    assert(!banks.set_slot(Page::Eighth, 0, 40));
+    assert(!banks.set_slot(static_cast<Page>(8), 0, 1));
+    assert(banks.slots(static_cast<Page>(8)) == Slots{});
+    banks.set_page_count(999);
+    assert(banks.page_count() == 8);
+    banks.set_page_count(0);
+    assert(banks.page_count() == 1);
+    assert(banks.active_page() == Page::Primary);
 }

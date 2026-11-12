@@ -1,23 +1,62 @@
 # Expanded Quick Select (development)
 
-A standalone Ratchet & Clank 1 OpenRAC mod intended to provide two independently editable eight-slot Quick Select pages, switched using L1/R1 while holding Triangle.
+A standalone OpenRAC mod for **Ratchet & Clank 1**, adding independently
+editable Quick Select pages. Choose **1 to 8 weapon wheels** in the OpenRAC
+launcher's **Mods → Expanded Quick Select → Weapon wheels** setting.
+**Two wheels is the default**, preserving the behaviour of v0.1.6.
+Settings take effect the next time the game starts.
 
-**Experimental development build.** The wheel and second-page editor have been successfully tried in-game; v0.1.1 did not prevent the airborne R1 slam, so v0.1.2 now filters the pad event history and still awaits player verification. Make a backup of your save before testing, and expect possible missing icons, UI glitches or crashes. This is not a stable launcher release.
+## Controls
 
-The existing Weapon Wheel Pause mod is not part of this repository and remains untouched.
+| Action | Controls |
+|---|---|
+| Open the weapon wheel | Hold Triangle |
+| Move to previous / next wheel | L1 / R1 while Triangle is held |
+| Open Quick Select editor | The game's normal pause menu |
+| Previous / next editor page | L2 / R2 |
+| Move to a slot in the editor | L1 / R1 (vanilla controls) |
+| Assign a weapon | Cross (vanilla controls) |
 
-## Build environment
+Page navigation wraps at either end. For example, with 4 wheels, R1 cycles
+1 → 2 → 3 → 4 → 1, while L1 reverses that order.
+The first page is shown whenever a gameplay wheel opens.
+Both the gameplay HUD and pause editor display `PAGE N / TOTAL`;
+the editor also shows `L2` and `R2` hints along the bottom of its right panel.
+When only one wheel is selected, page switching does nothing.
 
-The native build requires the official OpenRAC Mod SDK (1.14.5 pinned here), CMake 3.20+, and a C++17 compiler. The development workflow on GitHub Actions builds and tests a **Windows x64 artifact** on pushes to `development`. It does not publish a release.
+### Save compatibility
 
-### Testing controls
+RAC1 continues to own **page 1** in its normal save file. All other pages are
+stored by the mod under OpenRAC's per-mod `data_dir()`, separately for
+each memory-card save slot. The existing v0.1.6 **page 2** data file
+(`save-slot-N.dat`) is unchanged and readable without conversion.
+Pages 3–8 use `save-slot-N-page-3.dat` and so on.
 
-- Gameplay: hold **Triangle** to open Quick Select; press **L1 or R1** to switch between eight-slot pages. The wheel starts on page 1 each time it opens. In v0.1.2, shoulder presses while Triangle is held are consumed before world input handling, including the pad's recent-press history, rather than being interpreted as a gameplay attack or Thruster-Pack action.
-- Pause-menu Quick Select editor: **L2/R2** switch pages. **L1/R1** keep their original slot-selection behaviour, and **Cross** assigns an item to the visible page.
-- Page 1 remains stored by the game. Page 2 uses a separate file under OpenRAC's mod data folder, one for each memory-card save slot.
-- The HUD displays `PAGE 1 / 2` or `PAGE 2 / 2` while Triangle is held. In v0.1.3, the pause editor also draws `L2   PAGE 1 / 2   R2` (or page 2) at the bottom of the right-hand ring panel, using the game's own small menu font.
+Changing the wheel count **does not delete extra-page saves**. If you switch
+from 6 wheels to 2, save, then switch back to 6, the old assignments on
+pages 3–6 should still be present. Avoid deleting the mod's data directory.
+Saves made with the mod disabled do not contain these extra-page assignments,
+but the mod's separate data files remain available on re-enabling it.
 
-To test: open the repository's **Actions → Windows development build** run, download the `expanded-quick-select-windows-test` artifact, extract the mod ZIP and install that ZIP through OpenRAC's Mods tab. No stable release is published.
+### Supported systems and release status
+
+The mod targets RAC1 NTSC-U and PAL; NTSC-U was verified in-game for the
+two-wheel version (v0.1.6), including persistence and interaction with the
+separate Weapon Wheel Pause mod. **The configurable-wheel feature (v0.2.0)
+has not been tested in-game yet.** PAL, Linux and macOS still need testing.
+Back up your saves before testing a development build.
+
+This is a separate mod; [Weapon Wheel Pause](https://github.com/glawks/Pause-Weapon-Wheel)
+is not modified by this repository.
+
+## Build / download
+
+The private `development` branch runs a Windows x64 GitHub Actions build
+using the OpenRAC Mod SDK. Open the latest **Actions → Windows development
+build** run, download `expanded-quick-select-windows-test`, extract it,
+then install the mod ZIP through OpenRAC. No public release is published.
+
+For local core tests (CMake 3.20+ and C++17 compiler):
 
 ```sh
 cmake -S . -B build -DBUILD_TESTING=ON -DBUILD_OPENRAC_MOD=OFF
@@ -25,40 +64,6 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Fetch the SDK with `python tools/fetch_sdk.py` and configure with `-DBUILD_OPENRAC_MOD=ON` for the real native mod. The fetch script verifies the SDK archive against its published SHA-256 file.
-
-Without CMake, the dependency-free logic tests can also be run on Linux/macOS with `bash scripts/test-local.sh`.
-
-## Development status
-
-- [x] Project identity, basic manifest and native load entry point
-- [x] Pure C++ two-page assignment model and debounced input behaviour
-- [x] Versioned, validated, per-save-slot secondary-page storage (core only)
-- [x] Development hooks for the gameplay wheel and pause-menu editor
-- [x] Save/restore entry points and guarded secondary-page persistence
-- [x] SDK compilation and initial in-game wheel/editor test
-- [ ] Verify v0.1.2 early input/history suppression while jumping with the wheel open
-- [x] Windows development artifact workflow (no public release)
-
-**v0.1.3 editor footer is experimental:** the native-font rendering path borrows and restores an existing message table entry and HUD text buffer during the ring draw. It has build checks but is not yet verified in-game; if a font/layout issue occurs, use v0.1.2 instead. No gameplay-wheel inputs were changed.
-
-**v0.1.4 editor footer test:** the first attempt did not show the footer on NTSC-U. The menu renderer now selects an existing valid help record without assuming its ID range and logs each stage with `Quick Select footer:` in the OpenRAC log. If the line still does not appear, please copy those lines; they identify whether it is a message lookup, menu text hook, or drawing position issue. v0.1.2 is the proven fallback.
-
-**v0.1.5 footer-address correction:** the v0.1.4 log (`message table invalid: ptr=0 count=1515`) revealed a wrong NTSC-U help-table address. The NTSC pointer is at `0x0015F6A0`, not the generic -0x100 translation of the PAL address. The renderer now borrows and restores the bytes of an existing sufficiently long help message instead of writing to an unverified HUD buffer. This requires an in-game test; stay on v0.1.2 if rendering is unstable.
-
-### v0.1.6 — Quick Select input safety
-
-RAC1's airborne slam checks both R1 and R2, but v0.1.5 only suppressed L1/R1.
-While Triangle Quick Select is held **or** the Quick Select pause editor is
-active, v0.1.6 filters all four shoulder inputs from gameplay handling and
-recent-press history, without filtering the unmasked menu inputs. R1/L1
-navigation and L2/R2 editor-page changes remain available; outside the wheel
-and editor, slam/crouch controls remain unchanged. The wheel and pause-page
-labels are unchanged.
-
-**Save note:** Page 2 already persists as `save-slot-<n>.dat` in the mod's
-OpenRAC `data_dir()`. Page 1 is stored in the vanilla game's save. Loading or
-resaving while the mod is disabled can therefore change page 1's assignments;
-it should not remove the separate page-2 file. Report any apparent loss of
-page 2 separately so the save-slot identity and data-folder behaviour can be
-checked.
+For the native mod, fetch the SDK with `python tools/fetch_sdk.py`
+and use `-DBUILD_OPENRAC_MOD=ON`. The `sdk.lock` pins the SDK.
+Without CMake, run `bash scripts/test-local.sh` (Linux/macOS with g++).

@@ -97,13 +97,20 @@ bool replace_file(const fs::path& source, const fs::path& destination) {
 SlotStore::SlotStore(fs::path mod_data_dir)
     : mod_data_dir_(std::move(mod_data_dir)) {}
 
-fs::path SlotStore::path_for(int save_slot) const {
-    return mod_data_dir_ / ("save-slot-" + std::to_string(save_slot) + ".dat");
+fs::path SlotStore::path_for(int save_slot, Page page) const {
+    const auto prefix = "save-slot-" + std::to_string(save_slot);
+    // Preserve v0.1.6's exact filename for the already-saved second wheel.
+    return mod_data_dir_ / (page == Page::Secondary ? prefix + ".dat"
+        : prefix + "-page-" + std::to_string(page_index(page) + 1) + ".dat");
 }
 
 std::optional<Slots> SlotStore::load(int save_slot) const {
-    if (!valid_slot(save_slot) || mod_data_dir_.empty()) return std::nullopt;
-    std::ifstream stream(path_for(save_slot), std::ios::binary);
+    return load(save_slot, Page::Secondary);
+}
+std::optional<Slots> SlotStore::load(int save_slot, Page page) const {
+    if (!valid_slot(save_slot) || page_index(page) == 0 ||
+        page_index(page) >= kMaxPages || mod_data_dir_.empty()) return std::nullopt;
+    std::ifstream stream(path_for(save_slot, page), std::ios::binary);
     if (!stream) return std::nullopt;
     Bytes bytes{};
     stream.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
@@ -115,7 +122,12 @@ std::optional<Slots> SlotStore::load(int save_slot) const {
 }
 
 bool SlotStore::save(int save_slot, const Slots& secondary) const {
-    if (!valid_slot(save_slot) || !valid_items(secondary) || mod_data_dir_.empty()) {
+    return save(save_slot, Page::Secondary, secondary);
+}
+bool SlotStore::save(int save_slot, Page page, const Slots& secondary) const {
+    if (!valid_slot(save_slot) || page_index(page) == 0 ||
+        page_index(page) >= kMaxPages || !valid_items(secondary) ||
+        mod_data_dir_.empty()) {
         return false;
     }
     std::error_code error;
@@ -124,7 +136,7 @@ bool SlotStore::save(int save_slot, const Slots& secondary) const {
 
     static std::atomic<std::uint64_t> serial{0};
     const auto unique = std::chrono::steady_clock::now().time_since_epoch().count();
-    const fs::path temporary = path_for(save_slot).string() + "." +
+    const fs::path temporary = path_for(save_slot, page).string() + "." +
         std::to_string(unique) + "." + std::to_string(serial++) + ".tmp";
     const Bytes bytes = encode(secondary);
     {
@@ -143,7 +155,7 @@ bool SlotStore::save(int save_slot, const Slots& secondary) const {
             return false;
         }
     }
-    if (!replace_file(temporary, path_for(save_slot))) {
+    if (!replace_file(temporary, path_for(save_slot, page))) {
         fs::remove(temporary, error);
         return false;
     }

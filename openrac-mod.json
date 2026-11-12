@@ -2,9 +2,9 @@
   "format": 2,
   "id": "expanded-quick-select",
   "name": "Expanded Quick Select",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "author": "glawks",
-  "description": "Adds a second independently editable eight-slot Quick Select page to Ratchet & Clank 1.",
+  "description": "Configurable 1-8 independently editable Quick Select weapon wheels for Ratchet & Clank 1.",
   "type": "native",
   "api": "1.12",
   "games": {
@@ -27,5 +27,48 @@
     "rac1.save.new_game",
     "rac1.menu.quick_select.draw",
     "rac1.menu.item_text.draw"
+  ],
+  "settings": [
+    {
+      "key": "wheel_count",
+      "name": "Weapon wheels",
+      "type": "choice",
+      "default": "2",
+      "choices": [
+        {
+          "value": "1",
+          "name": "1 wheel"
+        },
+        {
+          "value": "2",
+          "name": "2 wheels"
+        },
+        {
+          "value": "3",
+          "name": "3 wheels"
+        },
+        {
+          "value": "4",
+          "name": "4 wheels"
+        },
+        {
+          "value": "5",
+          "name": "5 wheels"
+        },
+        {
+          "value": "6",
+          "name": "6 wheels"
+        },
+        {
+          "value": "7",
+          "name": "7 wheels"
+        },
+        {
+          "value": "8",
+          "name": "8 wheels"
+        }
+      ],
+      "description": "Number of Quick Select pages (1-8). Restart the game after changing."
+    }
   ]
 }
