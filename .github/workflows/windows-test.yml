@@ -169,7 +169,7 @@ jobs:
   release:
     name: Publish verified GitHub Release
     needs: merge
-    if: ${{ needs.merge.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: publish v'))) }}
+    if: "${{ needs.merge.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: publish v'))) }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
