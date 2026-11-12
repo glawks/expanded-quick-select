@@ -9,7 +9,7 @@ The number of wheels is adjustable in the OpenRAC launcher, with **two wheels en
 - **1–8 weapon wheels** (up to 64 Quick Select slots), selectable in the mod's launcher settings.
 - **L1/R1 page switching** while holding Triangle; left moves back and right moves forward.
 - **L2/R2 page switching** in the pause-menu Quick Select editor, without changing its normal slot-selection controls.
-- **Page indicators** in the gameplay wheel and pause-menu editor, showing `PAGE X / Y`.
+- **Page indicators with controls:** gameplay shows `L1   PAGE X / Y   R1`, while the pause editor shows `L2   PAGE X / Y   R2`. With one wheel, gameplay only displays `PAGE 1 / 1`.
 - **Persistent assignments** for each save slot, including pages beyond the original eight slots.
 - **Wrap-around navigation**, so moving past the first or last page cycles to the other end.
 - **Input protection** to prevent Quick Select shoulder-button navigation from triggering an unwanted airborne slam.
@@ -48,7 +48,7 @@ In the OpenRAC launcher, open **Mods → Expanded Quick Select → Weapon wheels
 | Navigate weapon slots in the pause-menu editor | **L1 / R1**, as in the original game |
 | Assign the selected weapon in the editor | **Cross**, as in the original game |
 
-The gameplay wheel always starts on **page 1** when opened. For example, with four pages enabled, pressing R1 cycles **1 → 2 → 3 → 4 → 1**; L1 moves in reverse.
+The gameplay wheel always starts on **page 1** when opened, and its footer shows **L1 / R1** around the page indicator whenever multiple wheels are enabled. For example, with four pages enabled, pressing R1 cycles **1 → 2 → 3 → 4 → 1**; L1 moves in reverse.
 
 The editor remembers changes when you move between pages, and its label shows the currently selected page, such as `L2   PAGE 3 / 4   R2`.
 

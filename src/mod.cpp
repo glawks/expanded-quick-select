@@ -1,5 +1,6 @@
 #include "expanded_quick_select/identity.hpp"
 #include "expanded_quick_select/editor_hint.hpp"
+#include "expanded_quick_select/gameplay_hint.hpp"
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
@@ -107,9 +108,9 @@ struct Runtime {
         label_visible = visible;
         if (!visible) { mod.hud_text_set({}); return; }
         openrac_hud_text text{};
-        const std::string message = "PAGE " +
-            std::to_string(eqs::page_index(banks.active_page()) + 1) +
-            " / " + std::to_string(banks.page_count());
+        // Show discoverable L1/R1 navigation hints only if another wheel exists.
+        const std::string message =
+            eqs::gameplay_page_hint(banks.active_page(), banks.page_count());
         if (message.size() + 1 > sizeof(text.text)) return;
         std::memcpy(text.text, message.c_str(), message.size() + 1);
         text.x = 0.5f;

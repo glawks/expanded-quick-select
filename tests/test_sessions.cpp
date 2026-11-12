@@ -1,6 +1,7 @@
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/editor_hint.hpp"
+#include "expanded_quick_select/gameplay_hint.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -76,6 +77,20 @@ int main() {
            "L2   PAGE 1 / 2   R2");
     assert(std::string_view(editor_page_hint(Page::Secondary)) ==
            "L2   PAGE 2 / 2   R2");
+    // Gameplay hints explain L1/R1 without requiring the README.
+    // A single configured wheel has no active page-switch buttons.
+    assert(gameplay_page_hint(Page::Primary, 1) == "PAGE 1 / 1");
+    assert(gameplay_page_hint(Page::Primary, 2) ==
+           "L1   PAGE 1 / 2   R1");
+    assert(gameplay_page_hint(Page::Secondary, 2) ==
+           "L1   PAGE 2 / 2   R1");
+    assert(gameplay_page_hint(Page::Third, 4) ==
+           "L1   PAGE 3 / 4   R1");
+    assert(gameplay_page_hint(Page::Eighth, 8) ==
+           "L1   PAGE 8 / 8   R1");
+    // The pause-menu editor keeps its existing L2/R2 hint.
+    assert(editor_page_hint(Page::Third, 4) ==
+           "L2   PAGE 3 / 4   R2");
     assert(editor_label_scroll_16ths(200) == -172 * 16);
     assert(editor_label_scroll_16ths(32) == 0);
     assert(editor_page_hint(Page::Third, 4) == "L2   PAGE 3 / 4   R2");

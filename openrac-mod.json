@@ -2,7 +2,7 @@
   "format": 2,
   "id": "expanded-quick-select",
   "name": "Expanded Quick Select",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "glawks",
   "description": "Configurable 1-8 independently editable Quick Select weapon wheels for Ratchet & Clank 1.",
   "type": "native",
