@@ -40,21 +40,31 @@ but the mod's separate data files remain available on re-enabling it.
 
 ### Supported systems and release status
 
-The mod targets RAC1 NTSC-U and PAL; NTSC-U was verified in-game for the
-two-wheel version (v0.1.6), including persistence and interaction with the
-separate Weapon Wheel Pause mod. **The configurable-wheel feature (v0.2.0)
-has not been tested in-game yet.** PAL, Linux and macOS still need testing.
-Back up your saves before testing a development build.
+The mod targets RAC1 NTSC-U and PAL. **v0.2.0 has been verified in-game on
+Windows NTSC-U**, including 1–8 wheel selection, page navigation, saved
+assignments and compatibility with the separate Weapon Wheel Pause mod.
+PAL remains unverified. Builds for Linux and macOS are now produced by CI,
+but require in-game testing on those operating systems. Back up your saves
+before testing a development build.
 
 This is a separate mod; [Weapon Wheel Pause](https://github.com/glawks/Pause-Weapon-Wheel)
 is not modified by this repository.
 
 ## Build / download
 
-The private `development` branch runs a Windows x64 GitHub Actions build
-using the OpenRAC Mod SDK. Open the latest **Actions → Windows development
-build** run, download `expanded-quick-select-windows-test`, extract it,
-then install the mod ZIP through OpenRAC. No public release is published.
+The private `development` branch runs a GitHub Actions **cross-platform
+development build** using the pinned OpenRAC Mod SDK. It builds Windows x64,
+Linux x64/ARM64, and macOS ARM64/Intel (Intel cross-compiled on ARM64), then
+packages the results. In the latest successful workflow run, download the
+**`expanded-quick-select-all-platforms-test`** artifact and install the
+**`expanded-quick-select-0.2.0.zip`** inside it through the OpenRAC launcher.
+Separate per-platform artifacts are also available for debugging.
+
+The combined ZIP contains the platform-specific `.dll`, `.so`, and `.dylib`
+libraries. OpenRAC selects the appropriate library automatically. CI checks
+that all five declared platforms made it into the archive. Build success does
+not prove the mod works in-game on every platform. **No GitHub Release or tag
+is created by this development workflow.**
 
 For local core tests (CMake 3.20+ and C++17 compiler):
 

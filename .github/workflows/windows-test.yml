@@ -1,4 +1,7 @@
-name: Windows development build
+# Build the same v0.2.0 source for every supported desktop platform.
+# Development only: no tags, releases or public publishing.
+# Based on OpenRAC's pinned SDK template build workflow.
+name: Cross-platform development build
 
 on:
   push:
@@ -8,42 +11,130 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: expanded-quick-select-dev-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  windows-x64:
-    runs-on: windows-2025
-    timeout-minutes: 20
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x86_64
+            os: windows-2025
+          - platform: linux-x86_64
+            os: ubuntu-22.04
+          - platform: linux-aarch64
+            os: ubuntu-24.04-arm
+          - platform: macos-arm64
+            os: macos-15
+            configure: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          - platform: macos-x86_64
+            os: macos-15
+            configure: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+            skip_tests: true
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Install Ninja
         run: python -m pip install ninja
       - name: Set up MSVC
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
           cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" && set" | ForEach-Object {
             if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -Append $env:GITHUB_ENV }
           }
-      - name: Fetch and verify official OpenRAC SDK
-        run: python tools/fetch_sdk.py
+      - name: Fetch and verify official OpenRAC Mod SDK
+        run: echo "SDK=$(python tools/fetch_sdk.py)" >> "$GITHUB_ENV"
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${{ matrix.configure }}
       - name: Compile
         run: cmake --build build --parallel
-      - name: Run unit tests
-        run: ctest --test-dir build --output-on-failure
-      - name: Package test-only Windows mod
+      - name: Run tests
+        if: ${{ !matrix.skip_tests }}
+        run: ctest --test-dir build --output-on-failure --no-tests=error
+      - name: Package platform mod
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          python .sdk/openrac-mod-sdk-1.14.5/tools/package_mod.py build/package/* -o dist
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+          python "$SDK/tools/package_mod.py" build/package/* -o dist
+          ls -lh dist
+          test "$(find dist -maxdepth 1 -name "*-$PLATFORM.zip" | wc -l | tr -d ' ')" = 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: expanded-quick-select-windows-test
+          name: expanded-quick-select-${{ matrix.platform }}-test
           path: dist/*.zip
+          if-no-files-found: error
+
+  merge:
+    name: Assemble universal desktop mod ZIP
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Fetch and verify official OpenRAC Mod SDK
+        run: echo "SDK=$(python tools/fetch_sdk.py)" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: expanded-quick-select-*-test
+          path: dist
+          merge-multiple: true
+      - name: Merge all five native builds
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("openrac-mod.json").read_text())
+          version = manifest["version"]
+          platforms = ["windows-x86_64", "linux-x86_64", "linux-aarch64",
+                       "macos-arm64", "macos-x86_64"]
+          expected = [Path("dist") / f"expanded-quick-select-{version}-{p}.zip" for p in platforms]
+          for path in expected:
+              if not path.is_file():
+                  raise SystemExit(f"Missing platform package: {path}")
+          print("Found all five platform archives")
+          PY
+          version=$(python -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
+          python "$SDK/tools/package_mod.py" --merge dist/expanded-quick-select-"$version"-*.zip -o dist/expanded-quick-select-"$version".zip
+          python - <<'PY'
+          import json, zipfile
+          from pathlib import Path
+          version = json.loads(Path("openrac-mod.json").read_text())["version"]
+          archive = Path("dist") / f"expanded-quick-select-{version}.zip"
+          expected = {"windows-x86_64", "linux-x86_64", "linux-aarch64",
+                      "macos-arm64", "macos-x86_64"}
+          with zipfile.ZipFile(archive) as z:
+              manifest = json.loads(z.read("openrac-mod.json"))
+              assert set(manifest["plugin"]) == expected, manifest.get("plugin")
+              for platform, lib in manifest["plugin"].items():
+                  assert lib in z.namelist(), f"Missing {platform}: {lib}"
+              print("Verified bundled libraries:", ", ".join(sorted(expected)))
+          PY
+          (cd dist && sha256sum *.zip > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: expanded-quick-select-all-platforms-test
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS
           if-no-files-found: error

@@ -129,3 +129,18 @@ This is an **experimental hook implementation**. The user confirmed the wheel wo
   page retention, editor movement, and sidecar migration compatibility.
 - Gameplay input filtering and native rendering hooks are otherwise unchanged.
 - **In-game tests on NTSC-U (and ultimately PAL) still required.**
+
+## Cross-platform development builds (v0.2.0)
+
+- Extended GitHub Actions on `development` with Windows x86-64, Linux x86-64,
+  Linux aarch64, macOS arm64 and macOS x86-64 (cross-built on Apple Silicon).
+- All five use the same pinned OpenRAC SDK and the CMake project; native
+  unit tests run for native runner architectures. macOS Intel compile/package
+  is checked, but its tests are skipped because the runner is ARM64.
+- Each package is validated and uploaded as an individual Actions artifact,
+  then the official SDK's `package_mod.py --merge` creates one combined ZIP.
+  The merged archive is inspected for exactly the five platform libraries,
+  and checksums are supplied alongside it.
+- No gameplay, save-format or manifest version changes. No releases or tags.
+- User verified v0.2.0 in-game on Windows NTSC-U with configurable wheel
+  counts and persistence. Mac/Linux runtime and PAL behaviour are unverified.
