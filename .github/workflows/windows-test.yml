@@ -212,7 +212,9 @@ jobs:
           # If an earlier attempt created the lightweight tag, permit a
           # retry only when it points to this exact verified commit.
           existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)
-          if [[ -n "$existing" ]]; then
+          # The CLI may return a JSON 404 body on stdout rather than
+          # an empty string. Only a 40-character Git SHA is a valid ref.
+          if [[ "$existing" =~ ^[0-9a-f]{40}$ ]]; then
             if [[ "$existing" != "$GITHUB_SHA" ]]; then
               echo "::error::$RELEASE_TAG already points to $existing, not $GITHUB_SHA"
               exit 1
