@@ -1,0 +1,7 @@
+# The OpenRAC SDK includes these files verbatim in each platform's ZIP.
+# Force identical bytes on Windows, Linux and macOS for package_mod --merge.
+*.md text eol=lf
+README* text eol=lf
+LICENSE* text eol=lf
+COPYING* text eol=lf
+*.json text eol=lf
