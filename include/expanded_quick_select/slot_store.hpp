@@ -22,3 +22,5 @@ private:
     std::filesystem::path path_for(int save_slot, Page page) const;
     std::filesystem::path mod_data_dir_;
 };
+
+} // namespace expanded_quick_select
