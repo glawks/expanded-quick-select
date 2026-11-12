@@ -1,72 +1,97 @@
-# Expanded Quick Select (development)
+# Expanded Quick Select
 
-A standalone OpenRAC mod for **Ratchet & Clank 1**, adding independently
-editable Quick Select pages. Choose **1 to 8 weapon wheels** in the OpenRAC
-launcher's **Mods → Expanded Quick Select → Weapon wheels** setting.
-**Two wheels is the default**, preserving the behaviour of v0.1.6.
-Settings take effect the next time the game starts.
+**More weapon slots for Ratchet & Clank 1.** Expanded Quick Select is a standalone [OpenRAC](https://github.com/OpenRAC/OpenRAC) mod that adds up to **eight independently configurable Quick Select wheels**, with eight slots per wheel.
 
-## Controls
+The number of wheels is adjustable in the OpenRAC launcher, with **two wheels enabled by default**. Switch between them using the shoulder buttons, or configure your weapons from the game's existing pause-menu editor. Your assignments are saved separately for each game save slot.
 
-| Action | Controls |
-|---|---|
-| Open the weapon wheel | Hold Triangle |
-| Move to previous / next wheel | L1 / R1 while Triangle is held |
-| Open Quick Select editor | The game's normal pause menu |
-| Previous / next editor page | L2 / R2 |
-| Move to a slot in the editor | L1 / R1 (vanilla controls) |
-| Assign a weapon | Cross (vanilla controls) |
+## Features
 
-Page navigation wraps at either end. For example, with 4 wheels, R1 cycles
-1 → 2 → 3 → 4 → 1, while L1 reverses that order.
-The first page is shown whenever a gameplay wheel opens.
-Both the gameplay HUD and pause editor display `PAGE N / TOTAL`;
-the editor also shows `L2` and `R2` hints along the bottom of its right panel.
-When only one wheel is selected, page switching does nothing.
+- **1–8 weapon wheels** (up to 64 Quick Select slots), selectable in the mod's launcher settings.
+- **L1/R1 page switching** while holding Triangle; left moves back and right moves forward.
+- **L2/R2 page switching** in the pause-menu Quick Select editor, without changing its normal slot-selection controls.
+- **Page indicators** in the gameplay wheel and pause-menu editor, showing `PAGE X / Y`.
+- **Persistent assignments** for each save slot, including pages beyond the original eight slots.
+- **Wrap-around navigation**, so moving past the first or last page cycles to the other end.
+- **Input protection** to prevent Quick Select shoulder-button navigation from triggering an unwanted airborne slam.
+- **Standalone operation**; no dependency on the separate Weapon Wheel Pause mod.
 
-### Save compatibility
+## Installation
 
-RAC1 continues to own **page 1** in its normal save file. All other pages are
-stored by the mod under OpenRAC's per-mod `data_dir()`, separately for
-each memory-card save slot. The existing v0.1.6 **page 2** data file
-(`save-slot-N.dat`) is unchanged and readable without conversion.
-Pages 3–8 use `save-slot-N-page-3.dat` and so on.
+You need **OpenRAC with Ratchet & Clank 1** (PAL or NTSC-U) and a build supporting the OpenRAC native mod API **1.12 or later**.
 
-Changing the wheel count **does not delete extra-page saves**. If you switch
-from 6 wheels to 2, save, then switch back to 6, the old assignments on
-pages 3–6 should still be present. Avoid deleting the mod's data directory.
-Saves made with the mod disabled do not contain these extra-page assignments,
-but the mod's separate data files remain available on re-enabling it.
+1. Download the **combined mod ZIP** from this repository's [GitHub Releases](https://github.com/glawks/expanded-quick-select/releases) once a release has been published.
+2. Open the **OpenRAC Launcher → Mods** tab.
+3. Add or install the downloaded mod ZIP and enable **Expanded Quick Select**.
+4. Start Ratchet & Clank 1.
 
-### Supported systems and release status
+When a release is available, the launcher can also install the mod from the repository URL:
 
-The mod targets RAC1 NTSC-U and PAL. **v0.2.0 has been verified in-game on
-Windows NTSC-U**, including 1–8 wheel selection, page navigation, saved
-assignments and compatibility with the separate Weapon Wheel Pause mod.
-PAL remains unverified. Builds for Linux and macOS are now produced by CI,
-but require in-game testing on those operating systems. Back up your saves
-before testing a development build.
+```text
+https://github.com/glawks/expanded-quick-select
+```
 
-This is a separate mod; [Weapon Wheel Pause](https://github.com/glawks/Pause-Weapon-Wheel)
-is not modified by this repository.
+The combined ZIP contains Windows, Linux and macOS native libraries; OpenRAC chooses the correct one for the user's platform.
 
-## Build / download
+## Configuration
 
-The private `development` branch runs a GitHub Actions **cross-platform
-development build** using the pinned OpenRAC Mod SDK. It builds Windows x64,
-Linux x64/ARM64, and macOS ARM64/Intel (Intel cross-compiled on ARM64), then
-packages the results. In the latest successful workflow run, download the
-**`expanded-quick-select-all-platforms-test`** artifact and install the
-**`expanded-quick-select-0.2.0.zip`** inside it through the OpenRAC launcher.
-Separate per-platform artifacts are also available for debugging.
+In the OpenRAC launcher, open **Mods → Expanded Quick Select → Weapon wheels** and choose a number from **1 to 8**. The default is **2**.
 
-The combined ZIP contains the platform-specific `.dll`, `.so`, and `.dylib`
-libraries. OpenRAC selects the appropriate library automatically. CI checks
-that all five declared platforms made it into the archive. Build success does
-not prove the mod works in-game on every platform. **No GitHub Release or tag
-is created by this development workflow.**
+**Restart the game after changing this setting.** Choosing one wheel leaves you with the original eight-slot layout and disables page switching. Increasing the count makes the additional pages available in the pause-menu editor.
 
-For local core tests (CMake 3.20+ and C++17 compiler):
+### Controls
+
+| Action | Input |
+| --- | --- |
+| Open Quick Select during gameplay | Hold **Triangle** |
+| Previous / next wheel in gameplay | **L1 / R1** while Triangle is held |
+| Previous / next wheel in the pause-menu editor | **L2 / R2** |
+| Navigate weapon slots in the pause-menu editor | **L1 / R1**, as in the original game |
+| Assign the selected weapon in the editor | **Cross**, as in the original game |
+
+The gameplay wheel always starts on **page 1** when opened. For example, with four pages enabled, pressing R1 cycles **1 → 2 → 3 → 4 → 1**; L1 moves in reverse.
+
+The editor remembers changes when you move between pages, and its label shows the currently selected page, such as `L2   PAGE 3 / 4   R2`.
+
+## Saving and existing saves
+
+**Existing RAC1 saves remain compatible.** The mod doesn't require a new game.
+
+- **Page 1** continues to use the game's normal Quick Select assignments and save data.
+- **Pages 2–8** are stored separately in OpenRAC's persistent mod-data folder, associated with each game save slot. They are not written into RAC1's normal memory-card save.
+- The existing page-2 file format is preserved when upgrading from an earlier two-wheel version of Expanded Quick Select.
+
+Lowering your configured wheel count **does not erase hidden pages**. For instance, if you configure six wheels, then reduce the setting to two, your assignments on pages 3–6 remain available when you increase the count again.
+
+You can also load and save while the mod is disabled, then enable it again; the mod's extra-wheel data remains stored separately. **Do not delete the mod's data folder** if you want to keep those assignments.
+
+## Compatibility
+
+| Platform | Status |
+| --- | --- |
+| **Windows x86-64 — RAC1 NTSC-U** | **Tested in-game**, including multiple wheels, save persistence and page switching |
+| **Windows — RAC1 PAL** | Supported by the mod; in-game testing still needed |
+| **Linux x86-64 / ARM64** | Both native builds pass CI; in-game testing still needed |
+| **macOS Apple Silicon / Intel** | Both native builds pass CI; in-game testing still needed |
+
+The mod has also been tested alongside the separate **Weapon Wheel Pause** mod. Expanded Quick Select does **not** require it and does not bundle or alter its code.
+
+Cross-platform **build success does not guarantee in-game compatibility**. Please report any issues with your operating system, RAC1 game version, and OpenRAC log.
+
+## Troubleshooting
+
+**Extra pages are missing:** Check the **Weapon wheels** launcher setting and restart the game after changing it.
+
+**A page looks empty:** Open the pause-menu Quick Select editor, use **L2/R2** to select that page, and assign weapons to its slots.
+
+**Assignments aren't being remembered:** Check that you loaded the same game save slot and that OpenRAC can write to the mod's persistent data folder. Don't remove the mod data when reinstalling.
+
+**Crashes, incorrect icons or controls behaving unexpectedly:** Include the OpenRAC log, your operating system, PAL/NTSC-U version, and any other active mods in a GitHub issue.
+
+## Building from source
+
+This project is written in **C++17** and uses the official OpenRAC Mod SDK. The repository pins the SDK version in `sdk.lock` and provides a GitHub Actions workflow for Windows x86-64, Linux x86-64/ARM64, and macOS ARM64/Intel.
+
+To run the portable core tests locally (CMake 3.20+ and a C++17 compiler):
 
 ```sh
 cmake -S . -B build -DBUILD_TESTING=ON -DBUILD_OPENRAC_MOD=OFF
@@ -74,6 +99,6 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-For the native mod, fetch the SDK with `python tools/fetch_sdk.py`
-and use `-DBUILD_OPENRAC_MOD=ON`. The `sdk.lock` pins the SDK.
-Without CMake, run `bash scripts/test-local.sh` (Linux/macOS with g++).
+To build the native mod, fetch the SDK with `python tools/fetch_sdk.py`, then configure with `-DBUILD_OPENRAC_MOD=ON`. On Linux/macOS, `bash scripts/test-local.sh` also runs the dependency-free core tests.
+
+Development builds and cross-platform packages are available as artifacts from the repository's **Actions** tab. Those are test builds, not official GitHub Releases.
