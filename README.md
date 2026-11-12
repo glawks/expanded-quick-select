@@ -95,6 +95,14 @@ Copyright (c) 2026 glawks.
 Files originating from the OpenRAC Mod SDK (such as `tools/fetch_sdk.py`)
 retain their original OpenRAC contributor copyright and licence notices.
 
+## Releases and contributing
+
+Version-tagged releases are built and packaged automatically for all five
+desktop platforms, with a combined installer ZIP and SHA-256 checksums.
+Development builds are available as GitHub Actions artifacts, but are not
+published as releases. See [Release instructions](docs/RELEASING.md) for
+the maintainer's release checklist.
+
 ## Building from source
 
 This project is written in **C++17** and uses the official OpenRAC Mod SDK. The repository pins the SDK version in `sdk.lock` and provides a GitHub Actions workflow for Windows x86-64, Linux x86-64/ARM64, and macOS ARM64/Intel.

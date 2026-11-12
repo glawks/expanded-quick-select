@@ -1,19 +1,22 @@
-# Build the same v0.2.0 source for every supported desktop platform.
-# Development only: no tags, releases or public publishing.
-# Based on OpenRAC's pinned SDK template build workflow.
-name: Cross-platform development build
+# Build/verify the same source on five desktop platforms.
+# Pushes to development/main build test artifacts only; a matching vX.Y.Z
+# tag additionally publishes the verified ZIPs and SHA256SUMS as a release.
+# Based on OpenRAC's pinned Mod SDK build/release workflow.
+name: Cross-platform build and release
 
 on:
   push:
-    branches: [development]
+    branches: [development, main]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: expanded-quick-select-dev-${{ github.ref }}
-  cancel-in-progress: true
+  group: expanded-quick-select-ci-${{ github.ref }}
+  # Release builds should not be cancelled by a second tag event.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
@@ -137,6 +140,19 @@ jobs:
           PY
           (cd dist && sha256sum *.zip > SHA256SUMS)
           cat dist/SHA256SUMS
+      - name: Validate archive, versions, MIT licence and checksums
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          version=$(python -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
+          if [ "$IS_TAG" = "true" ]; then
+            python tools/verify_release.py --tag "$RELEASE_TAG" --dist dist
+          else
+            # Run the same validation code on development/main without
+            # publishing or needing a real Git tag.
+            python tools/verify_release.py --tag "v$version" --dist dist
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: expanded-quick-select-all-platforms-test
@@ -144,3 +160,56 @@ jobs:
             dist/*.zip
             dist/SHA256SUMS
           if-no-files-found: error
+
+  # Only a version tag creates/updates GitHub Releases. Normal pushes to
+  # development/main and manual workflow runs remain test-only.
+  release:
+    name: Publish verified GitHub Release
+    needs: merge
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && needs.merge.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: expanded-quick-select-all-platforms-test
+          path: dist
+      - name: Verify tag, combined mod and hashes before publishing
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 tools/verify_release.py --tag "$RELEASE_TAG" --dist dist
+      - name: Create release and upload checked ZIPs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
+          sdk=$(python3 -c 'import json; print(json.load(open("sdk.lock"))["version"])')
+          cat > release-notes.md <<EOF
+          ## Expanded Quick Select $RELEASE_TAG
+
+          Add 1–8 configurable eight-slot Quick Select wheels to Ratchet & Clank 1 in OpenRAC.
+
+          **Install:** Add the combined `expanded-quick-select-$version.zip` to the OpenRAC launcher's Mods tab, or install from this repository URL.
+
+          **Controls:** Hold Triangle and press L1/R1 to switch wheels. In the pause-menu Quick Select editor, use L2/R2. Choose 1–8 wheels in the mod's launcher settings (default: 2).
+
+          **Compatibility:** Windows NTSC-U was tested in-game. PAL and Linux/macOS runtime behaviour still need testing; all five desktop library builds passed automated checks.
+
+          This release was built from commit `$GITHUB_SHA` with OpenRAC Mod SDK `$sdk`. The archives and `SHA256SUMS` are produced automatically by the official SDK packaging tools.
+          EOF
+          # A rerun may upload rebuilt assets for the same tag, but never
+          # creates a second release or publishes a different version.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" --clobber dist/*.zip dist/SHA256SUMS
+          else
+            args=()
+            if [[ "$RELEASE_TAG" == *-* ]]; then args+=(--prerelease); fi
+            gh release create "$RELEASE_TAG" --verify-tag --title "Expanded Quick Select $version" --notes-file release-notes.md "${args[@]}" dist/*.zip dist/SHA256SUMS
+          fi
