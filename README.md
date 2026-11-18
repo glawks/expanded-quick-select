@@ -13,24 +13,25 @@ The number of wheels is adjustable in the OpenRAC launcher, with **two wheels en
 - **Persistent assignments** for each save slot, including pages beyond the original eight slots.
 - **Wrap-around navigation**, so moving past the first or last page cycles to the other end.
 - **Input protection** to prevent Quick Select shoulder-button navigation from triggering an unwanted airborne slam.
+- **Android touchscreen navigation:** Contextual L2/R2 page buttons appear when editing a Quick Select loadout with multiple wheels; the existing L1/R1 slot controls remain unchanged.
 - **Standalone operation**; no dependency on the separate Weapon Wheel Pause mod.
 
 ## Installation
 
-You need **OpenRAC with Ratchet & Clank 1** (PAL or NTSC-U) and a build supporting the OpenRAC native mod API **1.13 or later** on this experimental Android branch.
+You need **OpenRAC with Ratchet & Clank 1** (PAL or NTSC-U) and a build supporting the OpenRAC native mod API **1.13 or later**. This release supports **Windows, Linux, macOS and Android ARM64**.
 
-1. Download the **combined mod ZIP** from this repository's [GitHub Releases](https://github.com/glawks/expanded-quick-select/releases) when a release is available.
+1. Download the **combined mod ZIP** from [GitHub Releases](https://github.com/glawks/expanded-quick-select/releases) or install the mod by repository URL in OpenRAC.
 2. Open the **OpenRAC Launcher → Mods** tab.
 3. Add or install the downloaded mod ZIP and enable **Expanded Quick Select**.
 4. Start Ratchet & Clank 1.
 
-When a release is available, the launcher can also install the mod from the repository URL:
+The OpenRAC launcher can also install the mod from the repository URL:
 
 ```text
 https://github.com/glawks/expanded-quick-select
 ```
 
-The official v1.0.1 combined ZIP contains Windows, Linux and macOS native libraries; OpenRAC chooses the correct one for the user's platform. An **experimental Android ARM64 library** is included only in the Android development test builds until it is verified on a device.
+Starting with **v1.0.2**, the combined ZIP contains **all six native platform libraries**, including Android ARM64. OpenRAC chooses the library for your device. A separate Android test package is no longer necessary.
 
 ## Configuration
 
@@ -52,6 +53,12 @@ The gameplay wheel always starts on **page 1** when opened, and its footer shows
 
 The editor remembers changes when you move between pages, and its label shows the currently selected page, such as `L2   PAGE 3 / 4   R2`.
 
+### Android touchscreen controls
+
+With **Touch controls → Action buttons** enabled in OpenRAC, contextual **L2** (previous wheel) and **R2** (next wheel) buttons appear to the left while editing Quick Select, provided **two or more wheels** are configured. The existing on-screen L1/R1 controls continue selecting weapon slots.
+
+These new buttons disappear after leaving the Quick Select editor and stay hidden when only one wheel is configured. They send ordinary controller inputs, so a physical gamepad can be used instead. If you choose OpenRAC's **Classic** touch layout, use its standard L2/R2 buttons.
+
 ## Saving and existing saves
 
 **Existing RAC1 saves remain compatible.** The mod doesn't require a new game.
@@ -72,7 +79,7 @@ You can also load and save while the mod is disabled, then enable it again; the 
 | **Windows — RAC1 PAL** | Supported by the mod; in-game testing still needed |
 | **Linux x86-64 / ARM64** | Both native builds pass CI; in-game testing still needed |
 | **macOS Apple Silicon / Intel** | Both native builds pass CI; in-game testing still needed |
-| **Android ARM64 — experimental branch** | Mod loads and menu displays in-game; test the new L2/R2 on-screen page controls |
+| **Android ARM64** | **Tested in-game by a user:** mod functions with L2/R2 touchscreen page controls; additional device configurations and save persistence remain to be tested |
 
 The mod has also been tested alongside the separate **Weapon Wheel Pause** mod. Expanded Quick Select does **not** require it and does not bundle or alter its code.
 
@@ -83,6 +90,8 @@ Cross-platform **build success does not guarantee in-game compatibility**. Pleas
 **Extra pages are missing:** Check the **Weapon wheels** launcher setting and restart the game after changing it.
 
 **A page looks empty:** Open the pause-menu Quick Select editor, use **L2/R2** to select that page, and assign weapons to its slots.
+
+**Android L2/R2 buttons aren't visible:** Set the wheel count to two or more, enter the Quick Select editor, and enable **Touch controls → Action buttons**. In Classic touch mode, use the regular virtual L2/R2 buttons.
 
 **Assignments aren't being remembered:** Check that you loaded the same game save slot and that OpenRAC can write to the mod's persistent data folder. Don't remove the mod data when reinstalling.
 
@@ -96,29 +105,16 @@ Copyright (c) 2026 glawks.
 Files originating from the OpenRAC Mod SDK (such as `tools/fetch_sdk.py`)
 retain their original OpenRAC contributor copyright and licence notices.
 
-## Experimental Android build
-
-The [`android-dev` branch](https://github.com/glawks/expanded-quick-select/tree/android-dev) adds an `android-arm64` native library, using the same NDK cross-compilation setup as Bolt Multiplier's Android test branch. Its version is **`1.0.2-android.2`**; it is **not** an official GitHub Release and does not change the publicly published version.
-
-1. Visit [Android branch Actions](https://github.com/glawks/expanded-quick-select/actions/workflows/windows-test.yml?query=branch%3Aandroid-dev) and open a successful run.
-2. Download the `expanded-quick-select-all-platforms-test` artifact and extract it.
-3. In OpenRAC Android, try installing `expanded-quick-select-1.0.2-android.2.zip` (all six platform libraries). Alternatively try `expanded-quick-select-1.0.2-android.2-android-arm64.zip`.
-4. Open the pause-menu Quick Select editor. Two labelled, tappable **L2** and **R2** buttons should appear near the upper-left part of the screen; tap them to change weapon-wheel pages. The existing on-screen L1/R1 buttons still navigate weapon slots. Exit the editor and verify the new buttons disappear. Configure one wheel and confirm the buttons stay hidden. Also test gameplay wheel L1/R1 switching and page persistence after saving and restarting.
-5. If it fails, retain the exact launcher incompatibility message and Android OpenRAC log.
-
-Android uses OpenRAC's native mod touch API (1.13+). The mod adds a menu-only touch action set without replacing the game's existing menu buttons; its L2/R2 buttons appear when the extra-wheel editor is active and at least two wheels are configured. They use the game's regular button input, so the save format and page switching remain unchanged. **The new buttons still need on-device confirmation.** Please test using a backed-up save, and do not merge Android support into the release branch before verifying it in-game.
-
 ## Releases and contributing
 
-Version-tagged releases are built and packaged automatically for all five
-desktop platforms, with a combined installer ZIP and SHA-256 checksums.
+Version-tagged releases are built and packaged automatically for **six platforms**, including Android ARM64, with a combined installer ZIP, individual platform packages and SHA-256 checksums.
 Development builds are available as GitHub Actions artifacts, but are not
 published as releases. See [Release instructions](docs/RELEASING.md) for
 the maintainer's release checklist.
 
 ## Building from source
 
-This project is written in **C++17** and uses the official OpenRAC Mod SDK. The repository pins the SDK version in `sdk.lock` and provides a GitHub Actions workflow for Windows x86-64, Linux x86-64/ARM64, macOS ARM64/Intel, and experimental Android ARM64.
+This project is written in **C++17** and uses the official OpenRAC Mod SDK. The repository pins the SDK version in `sdk.lock` and provides a GitHub Actions workflow for Windows x86-64, Linux x86-64/ARM64, macOS ARM64/Intel, and Android ARM64.
 
 To run the portable core tests locally (CMake 3.20+ and a C++17 compiler):
 

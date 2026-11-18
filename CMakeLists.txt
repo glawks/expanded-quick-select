@@ -39,7 +39,7 @@ if(BUILD_OPENRAC_MOD)
             set(OpenRACMod_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.sdk/openrac-mod-sdk-${sdk_version}/cmake")
         endif()
     endif()
-    # CMake package version is 1.0; manifest/API require runtime 1.12+.
+    # CMake package version is 1.0; manifest/API require runtime 1.13+.
     find_package(OpenRACMod 1.0 REQUIRED)
     openrac_add_mod(expanded_quick_select
         MANIFEST openrac-mod.json

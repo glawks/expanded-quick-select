@@ -1,4 +1,4 @@
-# Experimental Android arm64 test build plus five desktop platforms.
+# Build and package six supported platforms: five desktop targets and Android ARM64.
 # Pushes to development/main build test artifacts. A matching vX.Y.Z tag
 # publishes the verified ZIPs; an explicitly named main release commit may
 # create the matching tag and publish in its verified run.
@@ -41,8 +41,7 @@ jobs:
             os: macos-15
             configure: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
             skip_tests: true
-          # Same NDK toolchain and minimum API as Bolt Multiplier's android-dev.
-          # Cross-compile and package only: device execution still needs testing.
+          # Android ARM64 via NDK API 28; tested in-game separately.
           - platform: android-arm64
             os: ubuntu-24.04
             configure: >-
@@ -98,7 +97,7 @@ jobs:
           if-no-files-found: error
 
   merge:
-    name: Assemble combined desktop and Android test ZIP
+    name: Assemble combined six-platform mod ZIP
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -257,7 +256,11 @@ jobs:
 
           **Controls:** Hold Triangle and press L1/R1 to switch wheels. In the pause-menu Quick Select editor, use L2/R2. Choose 1–8 wheels in the mod's launcher settings (default: 2).
 
-          **Compatibility:** Windows NTSC-U was tested in-game. PAL, Linux/macOS and experimental Android arm64 still need in-game testing; six platform libraries passed automated build checks.
+          **New in v1.0.2:** Android ARM64 support and context-sensitive on-screen L2/R2 buttons to switch Quick Select editor pages; regular L1/R1 slot selection stays unchanged.
+
+          **Compatibility:** Windows NTSC-U and Android ARM64 have been confirmed working in-game. PAL and Linux/macOS still need in-game testing. All six native builds passed automated checks.
+
+          **Requirement:** OpenRAC native mod API 1.13 or later, for touch-control support.
 
           This release was built from commit `{sha}` with OpenRAC Mod SDK `{sdk}`. The archives and `SHA256SUMS` are produced automatically by the official SDK packaging tools.
           """
