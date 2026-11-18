@@ -17,7 +17,7 @@ The number of wheels is adjustable in the OpenRAC launcher, with **two wheels en
 
 ## Installation
 
-You need **OpenRAC with Ratchet & Clank 1** (PAL or NTSC-U) and a build supporting the OpenRAC native mod API **1.12 or later**.
+You need **OpenRAC with Ratchet & Clank 1** (PAL or NTSC-U) and a build supporting the OpenRAC native mod API **1.13 or later** on this experimental Android branch.
 
 1. Download the **combined mod ZIP** from this repository's [GitHub Releases](https://github.com/glawks/expanded-quick-select/releases) when a release is available.
 2. Open the **OpenRAC Launcher → Mods** tab.
@@ -72,7 +72,7 @@ You can also load and save while the mod is disabled, then enable it again; the 
 | **Windows — RAC1 PAL** | Supported by the mod; in-game testing still needed |
 | **Linux x86-64 / ARM64** | Both native builds pass CI; in-game testing still needed |
 | **macOS Apple Silicon / Intel** | Both native builds pass CI; in-game testing still needed |
-| **Android ARM64 — experimental branch** | NDK cross-compiled test build; Android game loading and gameplay **not yet verified** |
+| **Android ARM64 — experimental branch** | Mod loads and menu displays in-game; test the new L2/R2 on-screen page controls |
 
 The mod has also been tested alongside the separate **Weapon Wheel Pause** mod. Expanded Quick Select does **not** require it and does not bundle or alter its code.
 
@@ -98,15 +98,15 @@ retain their original OpenRAC contributor copyright and licence notices.
 
 ## Experimental Android build
 
-The [`android-dev` branch](https://github.com/glawks/expanded-quick-select/tree/android-dev) adds an `android-arm64` native library, using the same NDK cross-compilation setup as Bolt Multiplier's Android test branch. Its version is **`1.0.2-android.1`**; it is **not** an official GitHub Release and does not change the publicly published version.
+The [`android-dev` branch](https://github.com/glawks/expanded-quick-select/tree/android-dev) adds an `android-arm64` native library, using the same NDK cross-compilation setup as Bolt Multiplier's Android test branch. Its version is **`1.0.2-android.2`**; it is **not** an official GitHub Release and does not change the publicly published version.
 
 1. Visit [Android branch Actions](https://github.com/glawks/expanded-quick-select/actions/workflows/windows-test.yml?query=branch%3Aandroid-dev) and open a successful run.
 2. Download the `expanded-quick-select-all-platforms-test` artifact and extract it.
-3. In OpenRAC Android, try installing `expanded-quick-select-1.0.2-android.1.zip` (all six platform libraries). Alternatively try `expanded-quick-select-1.0.2-android.1-android-arm64.zip`.
-4. Verify that OpenRAC recognises the mod as compatible and loads it, then test gameplay wheel L1/R1 switching, pause-menu editor L2/R2 switching, and page persistence after saving and restarting.
+3. In OpenRAC Android, try installing `expanded-quick-select-1.0.2-android.2.zip` (all six platform libraries). Alternatively try `expanded-quick-select-1.0.2-android.2-android-arm64.zip`.
+4. Open the pause-menu Quick Select editor. Two labelled, tappable **L2** and **R2** buttons should appear near the upper-left part of the screen; tap them to change weapon-wheel pages. The existing on-screen L1/R1 buttons still navigate weapon slots. Exit the editor and verify the new buttons disappear. Configure one wheel and confirm the buttons stay hidden. Also test gameplay wheel L1/R1 switching and page persistence after saving and restarting.
 5. If it fails, retain the exact launcher incompatibility message and Android OpenRAC log.
 
-The Android build is **cross-compiled, not run on a device in CI**. Please test using a backed-up save, and do not merge Android support into the release branch before verifying it in-game.
+Android uses OpenRAC's native mod touch API (1.13+). The mod adds a menu-only touch action set without replacing the game's existing menu buttons; its L2/R2 buttons appear when the extra-wheel editor is active and at least two wheels are configured. They use the game's regular button input, so the save format and page switching remain unchanged. **The new buttons still need on-device confirmation.** Please test using a backed-up save, and do not merge Android support into the release branch before verifying it in-game.
 
 ## Releases and contributing
 

@@ -75,7 +75,7 @@ def verify(tag: str, dist: Path, root: Path) -> None:
             raise ValueError("Combined ZIP has a corrupted member")
         files = set(archive.namelist())
         contents = json.loads(archive.read("openrac-mod.json"))
-        for key in ("id", "version", "license", "api", "games", "settings", "hooks"):
+        for key in ("id", "version", "license", "api", "games", "settings", "hooks", "touch"):
             if contents.get(key) != manifest.get(key):
                 raise ValueError(f"Combined ZIP manifest mismatch: {key}")
         plugins = contents.get("plugin", {})
@@ -84,11 +84,27 @@ def verify(tag: str, dist: Path, root: Path) -> None:
         for platform, path in plugins.items():
             if path not in files or not path.startswith(f"lib/{platform}/"):
                 raise ValueError(f"Missing or misplaced {platform} library: {path}")
-        for filename in ("README.md", "LICENSE"):
+        for filename in ("README.md", "LICENSE",
+                         "touch/quick-select.json", "touch/l2.svg", "touch/r2.svg"):
             if filename not in files:
                 raise ValueError(f"Missing {filename} in combined ZIP")
             if archive.read(filename) != (root / filename).read_bytes():
                 raise ValueError(f"Combined ZIP {filename} differs from repository")
+        actions = {a["id"]: a for a in
+                   json.loads(archive.read("touch/quick-select.json"))["contexts"]["menu"]["actions"]}
+        for name, button, icon, slot in (
+            ("eqs_page_previous", "l2", "eqs_l2", 1),
+            ("eqs_page_next", "r2", "eqs_r2", 2),
+        ):
+            action = actions.get(name, {})
+            if (action.get("press") != [button]
+                    or action.get("when") != "eqs_pages"
+                    or action.get("icon") != icon
+                    or action.get("side") != "left"
+                    or action.get("at") != slot):
+                raise ValueError(f"Broken touch page button: {name}")
+        if tuple(map(int, manifest["api"].split("."))) < (1, 13):
+            raise ValueError("Touch button support requires OpenRAC mod API 1.13+")
     print(f"Release verification passed: {tag}, {len(PLATFORMS)} platforms, "
           f"{len(names)} archives and SHA256SUMS")
 

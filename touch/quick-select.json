@@ -1,0 +1,34 @@
+{
+  "contexts": {
+    "menu": {
+      "actions": [
+        {
+          "id": "eqs_page_previous",
+          "icon": "eqs_l2",
+          "press": [
+            "l2"
+          ],
+          "when": "eqs_pages",
+          "side": "left",
+          "at": 1,
+          "size": "medium"
+        },
+        {
+          "id": "eqs_page_next",
+          "icon": "eqs_r2",
+          "press": [
+            "r2"
+          ],
+          "when": "eqs_pages",
+          "side": "left",
+          "at": 2,
+          "size": "medium"
+        }
+      ]
+    }
+  },
+  "icons": {
+    "eqs_l2": "touch/l2.svg",
+    "eqs_r2": "touch/r2.svg"
+  }
+}

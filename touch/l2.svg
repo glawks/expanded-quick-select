@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 100 100">
+  <!-- L2: outline paths, no font dependency on Android -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9">
+    <path d="M-34 -26 V25 H-11" stroke="#ffffff"/>
+    <path d="M6 -17 C6 -31 34 -32 34 -13 C34 -2 6 13 6 25 H35" stroke="#ff8000"/>
+  </g>
+</svg>

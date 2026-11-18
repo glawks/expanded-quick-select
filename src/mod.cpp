@@ -123,6 +123,8 @@ struct Runtime {
     }
     void reset(bool new_game) {
         editor.end();
+        // Clear the on-screen page triggers when a save is restored or reset.
+        mod.touch_hint("eqs_pages", false);
         editor_address = 0;
         banks.reset_for_new_game(read(exe(kSavedSlots)));
         last_save_slot = -2;
@@ -365,8 +367,8 @@ std::unique_ptr<Runtime> runtime;
 void load(openrac::Mod& mod) {
     if (mod.game() != "rac1" || (mod.version() != "pal" && mod.version() != "ntsc"))
         throw openrac::Error("Expanded Quick Select requires RAC1 PAL or NTSC-U");
-    if (mod.api_minor() < 12)
-        throw openrac::Error("Expanded Quick Select requires OpenRAC mod API 1.12+");
+    if (mod.api_minor() < 13)
+        throw openrac::Error("Expanded Quick Select touch controls require OpenRAC mod API 1.13+");
     runtime = std::make_unique<Runtime>(mod);
     Runtime& r = *runtime;
 
@@ -470,6 +472,10 @@ void load(openrac::Mod& mod) {
         if (eqs::valid_game_slots(visible)) r.banks.set_primary(visible);
         r.editor.begin(r.banks);
         r.editor_address = page;
+        // OpenRAC 1.13+ shows custom touch L2/R2 buttons only while
+        // editing a Quick Select loadout with more than one wheel.
+        // These send real shoulder presses, not simulated HUD clicks.
+        r.mod.touch_hint("eqs_pages", r.banks.page_count() > 1);
         r.footer_diagnostic.clear();
         r.mod.info("Quick Select footer: editor opened");
         return result;
@@ -498,6 +504,7 @@ void load(openrac::Mod& mod) {
         r.write(r.exe(kSavedSlots), r.banks.slots(eqs::Page::Primary));
         r.save_extra_pages();
         r.editor.end();
+        r.mod.touch_hint("eqs_pages", false);
         r.editor_address = 0;
         return std::int32_t{0};
     });

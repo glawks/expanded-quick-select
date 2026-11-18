@@ -2,11 +2,11 @@
   "format": 2,
   "id": "expanded-quick-select",
   "name": "Expanded Quick Select",
-  "version": "1.0.2-android.1",
+  "version": "1.0.2-android.2",
   "author": "glawks",
   "description": "Configurable 1-8 independently editable Quick Select weapon wheels for Ratchet & Clank 1.",
   "type": "native",
-  "api": "1.12",
+  "api": "1.13",
   "games": {
     "rac1": [
       "pal",
@@ -71,5 +71,6 @@
       "description": "Number of Quick Select pages (1-8). Restart the game after changing."
     }
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "touch": "touch/quick-select.json"
 }
