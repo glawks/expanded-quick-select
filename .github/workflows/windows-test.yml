@@ -1,4 +1,4 @@
-# Build/verify the same source on five desktop platforms.
+# Experimental Android arm64 test build plus five desktop platforms.
 # Pushes to development/main build test artifacts. A matching vX.Y.Z tag
 # publishes the verified ZIPs; an explicitly named main release commit may
 # create the matching tag and publish in its verified run.
@@ -7,7 +7,7 @@ name: Cross-platform build and release
 
 on:
   push:
-    branches: [development, main]
+    branches: [development, main, android-dev]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -40,6 +40,14 @@ jobs:
           - platform: macos-x86_64
             os: macos-15
             configure: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+            skip_tests: true
+          # Same NDK toolchain and minimum API as Bolt Multiplier's android-dev.
+          # Cross-compile and package only: device execution still needs testing.
+          - platform: android-arm64
+            os: ubuntu-24.04
+            configure: >-
+              -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake
+              -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28
             skip_tests: true
     defaults:
       run:
@@ -90,7 +98,7 @@ jobs:
           if-no-files-found: error
 
   merge:
-    name: Assemble universal desktop mod ZIP
+    name: Assemble combined desktop and Android test ZIP
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -108,7 +116,7 @@ jobs:
           pattern: expanded-quick-select-*-test
           path: dist
           merge-multiple: true
-      - name: Merge all five native builds
+      - name: Merge all six native builds
         run: |
           python - <<'PY'
           import json
@@ -116,12 +124,12 @@ jobs:
           manifest = json.loads(Path("openrac-mod.json").read_text())
           version = manifest["version"]
           platforms = ["windows-x86_64", "linux-x86_64", "linux-aarch64",
-                       "macos-arm64", "macos-x86_64"]
+                       "macos-arm64", "macos-x86_64", "android-arm64"]
           expected = [Path("dist") / f"expanded-quick-select-{version}-{p}.zip" for p in platforms]
           for path in expected:
               if not path.is_file():
                   raise SystemExit(f"Missing platform package: {path}")
-          print("Found all five platform archives")
+          print("Found all six platform archives")
           PY
           version=$(python -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
           python "$SDK/tools/package_mod.py" --merge dist/expanded-quick-select-"$version"-*.zip -o dist/expanded-quick-select-"$version".zip
@@ -131,7 +139,7 @@ jobs:
           version = json.loads(Path("openrac-mod.json").read_text())["version"]
           archive = Path("dist") / f"expanded-quick-select-{version}.zip"
           expected = {"windows-x86_64", "linux-x86_64", "linux-aarch64",
-                      "macos-arm64", "macos-x86_64"}
+                      "macos-arm64", "macos-x86_64", "android-arm64"}
           with zipfile.ZipFile(archive) as z:
               manifest = json.loads(z.read("openrac-mod.json"))
               assert set(manifest["plugin"]) == expected, manifest.get("plugin")
@@ -249,7 +257,7 @@ jobs:
 
           **Controls:** Hold Triangle and press L1/R1 to switch wheels. In the pause-menu Quick Select editor, use L2/R2. Choose 1–8 wheels in the mod's launcher settings (default: 2).
 
-          **Compatibility:** Windows NTSC-U was tested in-game. PAL and Linux/macOS runtime behaviour still need testing; all five desktop library builds passed automated checks.
+          **Compatibility:** Windows NTSC-U was tested in-game. PAL, Linux/macOS and experimental Android arm64 still need in-game testing; six platform libraries passed automated build checks.
 
           This release was built from commit `{sha}` with OpenRAC Mod SDK `{sdk}`. The archives and `SHA256SUMS` are produced automatically by the official SDK packaging tools.
           """

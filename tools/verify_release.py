@@ -17,6 +17,7 @@ PLATFORMS = (
     "linux-aarch64",
     "macos-arm64",
     "macos-x86_64",
+    "android-arm64",
 )
 MOD_ID = "expanded-quick-select"
 

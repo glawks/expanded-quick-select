@@ -30,7 +30,7 @@ When a release is available, the launcher can also install the mod from the repo
 https://github.com/glawks/expanded-quick-select
 ```
 
-The combined ZIP contains Windows, Linux and macOS native libraries; OpenRAC chooses the correct one for the user's platform.
+The official v1.0.1 combined ZIP contains Windows, Linux and macOS native libraries; OpenRAC chooses the correct one for the user's platform. An **experimental Android ARM64 library** is included only in the Android development test builds until it is verified on a device.
 
 ## Configuration
 
@@ -72,6 +72,7 @@ You can also load and save while the mod is disabled, then enable it again; the 
 | **Windows — RAC1 PAL** | Supported by the mod; in-game testing still needed |
 | **Linux x86-64 / ARM64** | Both native builds pass CI; in-game testing still needed |
 | **macOS Apple Silicon / Intel** | Both native builds pass CI; in-game testing still needed |
+| **Android ARM64 — experimental branch** | NDK cross-compiled test build; Android game loading and gameplay **not yet verified** |
 
 The mod has also been tested alongside the separate **Weapon Wheel Pause** mod. Expanded Quick Select does **not** require it and does not bundle or alter its code.
 
@@ -95,6 +96,18 @@ Copyright (c) 2026 glawks.
 Files originating from the OpenRAC Mod SDK (such as `tools/fetch_sdk.py`)
 retain their original OpenRAC contributor copyright and licence notices.
 
+## Experimental Android build
+
+The [`android-dev` branch](https://github.com/glawks/expanded-quick-select/tree/android-dev) adds an `android-arm64` native library, using the same NDK cross-compilation setup as Bolt Multiplier's Android test branch. Its version is **`1.0.2-android.1`**; it is **not** an official GitHub Release and does not change the publicly published version.
+
+1. Visit [Android branch Actions](https://github.com/glawks/expanded-quick-select/actions/workflows/windows-test.yml?query=branch%3Aandroid-dev) and open a successful run.
+2. Download the `expanded-quick-select-all-platforms-test` artifact and extract it.
+3. In OpenRAC Android, try installing `expanded-quick-select-1.0.2-android.1.zip` (all six platform libraries). Alternatively try `expanded-quick-select-1.0.2-android.1-android-arm64.zip`.
+4. Verify that OpenRAC recognises the mod as compatible and loads it, then test gameplay wheel L1/R1 switching, pause-menu editor L2/R2 switching, and page persistence after saving and restarting.
+5. If it fails, retain the exact launcher incompatibility message and Android OpenRAC log.
+
+The Android build is **cross-compiled, not run on a device in CI**. Please test using a backed-up save, and do not merge Android support into the release branch before verifying it in-game.
+
 ## Releases and contributing
 
 Version-tagged releases are built and packaged automatically for all five
@@ -105,7 +118,7 @@ the maintainer's release checklist.
 
 ## Building from source
 
-This project is written in **C++17** and uses the official OpenRAC Mod SDK. The repository pins the SDK version in `sdk.lock` and provides a GitHub Actions workflow for Windows x86-64, Linux x86-64/ARM64, and macOS ARM64/Intel.
+This project is written in **C++17** and uses the official OpenRAC Mod SDK. The repository pins the SDK version in `sdk.lock` and provides a GitHub Actions workflow for Windows x86-64, Linux x86-64/ARM64, macOS ARM64/Intel, and experimental Android ARM64.
 
 To run the portable core tests locally (CMake 3.20+ and a C++17 compiler):
 
