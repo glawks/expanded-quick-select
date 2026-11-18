@@ -45,4 +45,16 @@ if(BUILD_OPENRAC_MOD)
         MANIFEST openrac-mod.json
         SOURCES src/mod.cpp)
     target_link_libraries(expanded_quick_select PRIVATE expanded_quick_select_core)
+
+    # openrac_add_mod copies only the plugin, manifest, README and LICENSE.
+    # The SDK packager validates the manifest's "touch" assets in the
+    # package directory, so copy our touch JSON/SVGs on every build (even
+    # when only an icon changes and the native library is already up to date).
+    add_custom_target(expanded_quick_select_touch_assets ALL
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/touch"
+            "${CMAKE_BINARY_DIR}/package/expanded_quick_select/touch"
+        DEPENDS expanded_quick_select
+        COMMENT "Adding Quick Select touch buttons to the mod package"
+        VERBATIM)
 endif()
