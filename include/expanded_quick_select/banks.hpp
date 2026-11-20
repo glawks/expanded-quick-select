@@ -36,6 +36,7 @@ public:
     bool set_slot(Page page, std::size_t index, std::int32_t item) noexcept;
 
     Page active_page() const noexcept;
+    bool wheel_open() const noexcept;
     void open_wheel() noexcept;
     void close_wheel() noexcept;
     // Arguments are held states. L1 steps back, R1 forward, wrapping
