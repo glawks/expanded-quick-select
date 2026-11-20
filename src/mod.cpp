@@ -4,7 +4,6 @@
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
-#include "expanded_quick_select/editor_capture_guard.hpp"
 #include "expanded_quick_select/compat_api.h"
 #include "openrac/games/rac1.hpp"
 #include "openrac/mod.hpp"
@@ -54,7 +53,6 @@ struct Runtime {
     int last_save_slot = -2;
     openrac::gaddr editor_address = 0;
     bool warned_layout = false;
-    bool warned_external_slot_write = false;
     bool label_visible = false;
     // Acquired from the game's own menu-label hook when it runs.
     openrac::rac1::Menu_ItemText_Draw::fn menu_text_draw = nullptr;
@@ -517,10 +515,8 @@ void load(openrac::Mod& mod) {
         return result;
     });
     mod.hook<openrac::rac1::Menu_ItemSlots_Update>([&r](auto original, std::uint32_t page) {
-        const bool editing = r.editor.active() && r.editor_address == page;
-        const auto pressed = editing
-            ? r.mod.memory().read<std::uint32_t>(r.exe(kPadState) + 0x1C4) : 0u;
-        if (editing) {
+        if (r.editor.active() && r.editor_address == page) {
+            const auto pressed = r.mod.memory().read<std::uint32_t>(r.exe(kPadState) + 0x1C4);
             const auto visible = r.read(page + 0x30);
             if (r.editor.switch_page(r.banks, (pressed & kL2) != 0,
                                      (pressed & kR2) != 0, visible)) {
@@ -531,28 +527,9 @@ void load(openrac::Mod& mod) {
                 r.mod.memory().write<std::int32_t>(page + 0x50, cursor % 8);
             }
         }
-        // Capture the page *we* installed, not an unrelated plugin's complete
-        // native eight-slot replacement. Secondary pages are EQS-owned.
-        const bool secondary = editing && r.editor.active_page() != eqs::Page::Primary;
-        const auto expected = secondary ? r.editor.visible_slots(r.banks) : eqs::Slots{};
         const auto result = original(page);
-        if (editing && r.editor.active() && r.editor_address == page) {
-            if (secondary) {
-                const auto decision = eqs::guard_secondary_capture(
-                    expected, r.read(page + 0x30), (pressed & 0x40u) != 0);
-                if (decision.rejected) {
-                    r.write(page + 0x30, expected);
-                    if (!r.warned_external_slot_write) {
-                        r.warned_external_slot_write = true;
-                        r.mod.warn("Quick Select: rejected unexpected replacement of a secondary wheel");
-                    }
-                } else {
-                    r.editor.capture(r.banks, decision.slots);
-                }
-            } else {
-                r.editor.capture(r.banks, r.read(page + 0x30));
-            }
-        }
+        if (r.editor.active() && r.editor_address == page)
+            r.editor.capture(r.banks, r.read(page + 0x30));
         return result;
     });
     mod.hook<openrac::rac1::Menu_QuickSelect_Store>([&r](auto original, std::uint32_t page) {
