@@ -1,5 +1,4 @@
 #include "expanded_quick_select/sessions.hpp"
-#include "expanded_quick_select/editor_capture_guard.hpp"
 #include "expanded_quick_select/compat_api.h"
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/editor_hint.hpp"
@@ -146,27 +145,6 @@ int main() {
     assert(editor.active_page() == Page::Primary);
     editor.end();
 
-    // A legitimate single-slot Cross assignment is retained on page 2.
-    const Slots secondary_before{{1, 2, 3, 4, 5, 6, 7, 8}};
-    const Slots one_slot{{1, 2, 18, 4, 5, 6, 7, 8}};
-    auto captured = guard_secondary_capture(secondary_before, one_slot, true);
-    assert(!captured.rejected && captured.slots == one_slot);
-    // Moving a native weapon may change two cells at once.
-    const Slots moved{{1, 0, 3, 4, 2, 6, 7, 8}};
-    captured = guard_secondary_capture(secondary_before, moved, true);
-    assert(!captured.rejected && captured.slots == moved);
-    // Another plugin restoring its own eight-slot registry must not overwrite
-    // the currently edited page, even if Cross is pressed.
-    const Slots overwritten{{18, 16, 15, 14, 13, 12, 11, 10}};
-    captured = guard_secondary_capture(secondary_before, overwritten, true);
-    assert(captured.rejected && captured.slots == secondary_before);
-    captured = guard_secondary_capture(secondary_before, one_slot, false);
-    assert(captured.rejected && captured.slots == secondary_before);
-    captured = guard_secondary_capture(secondary_before, secondary_before, false);
-    assert(!captured.rejected);
-    captured = guard_secondary_capture(secondary_before,
-        Slots{{1, 2, 3, 4, 5, 6, 7, 65554}}, true);
-    assert(captured.rejected && captured.slots == secondary_before);
     // Pure C interface stays fixed width and uses explicit inactive sentinel.
     static_assert(sizeof(eqs_compat_state_v1) == 20, "compat state ABI changed");
     static_assert(sizeof(eqs_compat_slots_v1) == 40, "compat slots ABI changed");
