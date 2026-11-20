@@ -54,6 +54,17 @@ The page-two legacy sidecar format and all other page files are unchanged.
 If experimental testing has already saved an empty page, updating the plugin
 cannot reconstruct those assignments. Restore backed-up EQS data if needed.
 
+## Opt-in diagnostic logging
+
+Enable the **Log Quick Select interoperability diagnostics** setting in the
+development mod and restart. Every editor open, page change, or native slot
+rewrite within the shared update hook can report the edited page, whether Cross
+was pressed, and eight slot IDs before/after. Logging stops after 64 events.
+This is **observational only**: the mod no longer blocks full-wheel writes.
+
+For a suggested cooperative solution and exact source-level conflicts, see
+[REVOLVERATOR-INTEGRATION.md](REVOLVERATOR-INTEGRATION.md).
+
 ## Validation before release
 
 Test native-only editing, slot moves and removal, different game save slots,
