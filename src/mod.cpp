@@ -5,6 +5,7 @@
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
 #include "expanded_quick_select/compat_api.h"
+#include "expanded_quick_select/interop_diagnostics.hpp"
 #include "openrac/games/rac1.hpp"
 #include "openrac/mod.hpp"
 #include <array>
@@ -43,6 +44,7 @@ struct Runtime {
         // fallback in case of a manually edited settings file.
         banks.set_page_count(count.size() == 1 && count[0] >= '1' && count[0] <= '8'
                                  ? static_cast<std::size_t>(count[0] - '0') : 2);
+        compat_trace = m.setting<bool>("compat_trace");
     }
     openrac::Mod& mod;
     eqs::SlotStore store;
@@ -54,9 +56,39 @@ struct Runtime {
     openrac::gaddr editor_address = 0;
     bool warned_layout = false;
     bool label_visible = false;
+    bool compat_trace = false;
+    std::size_t compat_log_count = 0;
     // Acquired from the game's own menu-label hook when it runs.
     openrac::rac1::Menu_ItemText_Draw::fn menu_text_draw = nullptr;
     std::string footer_diagnostic;
+
+    // Diagnostic mode deliberately observes only; it cannot modify, reject or
+    // save slot assignments. Limit logging to avoid flooding a player's log.
+    static std::string format_native_slots(const eqs::Slots& slots) {
+        std::string result = "[";
+        for (std::size_t i = 0; i < slots.size(); ++i) {
+            if (i) result += ",";
+            result += std::to_string(slots[i]);
+        }
+        return result + "]";
+    }
+    void trace_slot_event(const char* stage, eqs::Page page,
+                          const eqs::Slots& before, const eqs::Slots& after,
+                          std::uint32_t pressed, bool force = false) {
+        if (!compat_trace || compat_log_count >= 64) return;
+        const auto changes = eqs::changed_native_slots(before, after);
+        if (!changes && !force) return;
+        ++compat_log_count;
+        mod.info("EQS interop " + std::string(stage) +
+                 " page=" + std::to_string(eqs::page_index(page) + 1) +
+                 "/" + std::to_string(banks.page_count()) +
+                 " changed=" + std::to_string(changes) +
+                 " cross=" + std::to_string((pressed & 0x40u) != 0) +
+                 " before=" + format_native_slots(before) +
+                 " after=" + format_native_slots(after));
+        if (compat_log_count == 64)
+            mod.info("EQS interop: diagnostic log limit reached (64 events)");
+    }
 
     void footer_note(const std::string& message) {
         if (footer_diagnostic == message) return;
@@ -506,6 +538,8 @@ void load(openrac::Mod& mod) {
         if (eqs::valid_game_slots(visible)) r.banks.set_primary(visible);
         r.editor.begin(r.banks);
         r.editor_address = page;
+        r.trace_slot_event("editor-open", eqs::Page::Primary,
+                           visible, visible, 0, true);
         // OpenRAC 1.13+ shows custom touch L2/R2 buttons only while
         // editing a Quick Select loadout with more than one wheel.
         // These send real shoulder presses, not simulated HUD clicks.
@@ -515,8 +549,11 @@ void load(openrac::Mod& mod) {
         return result;
     });
     mod.hook<openrac::rac1::Menu_ItemSlots_Update>([&r](auto original, std::uint32_t page) {
-        if (r.editor.active() && r.editor_address == page) {
-            const auto pressed = r.mod.memory().read<std::uint32_t>(r.exe(kPadState) + 0x1C4);
+        const bool editing = r.editor.active() && r.editor_address == page;
+        std::uint32_t pressed = 0;
+        bool switched = false;
+        if (editing) {
+            pressed = r.mod.memory().read<std::uint32_t>(r.exe(kPadState) + 0x1C4);
             const auto visible = r.read(page + 0x30);
             if (r.editor.switch_page(r.banks, (pressed & kL2) != 0,
                                      (pressed & kR2) != 0, visible)) {
@@ -525,16 +562,28 @@ void load(openrac::Mod& mod) {
                 std::int32_t cursor = 0;
                 while (cursor < 8 && next[cursor] != 0) ++cursor;
                 r.mod.memory().write<std::int32_t>(page + 0x50, cursor % 8);
+                switched = true;
             }
         }
+        const auto visible_before = editing && r.compat_trace ? r.read(page + 0x30) : eqs::Slots{};
         const auto result = original(page);
-        if (r.editor.active() && r.editor_address == page)
-            r.editor.capture(r.banks, r.read(page + 0x30));
+        if (r.editor.active() && r.editor_address == page) {
+            const auto visible_after = r.read(page + 0x30);
+            if (editing && r.compat_trace) {
+                r.trace_slot_event(switched ? "page-switch/update" : "editor-update",
+                                   r.editor.active_page(), visible_before,
+                                   visible_after, pressed, switched);
+            }
+            r.editor.capture(r.banks, visible_after);
+        }
         return result;
     });
     mod.hook<openrac::rac1::Menu_QuickSelect_Store>([&r](auto original, std::uint32_t page) {
         if (!r.editor.active() || r.editor_address != page) return original(page);
-        r.editor.capture(r.banks, r.read(page + 0x30));
+        const auto visible = r.read(page + 0x30);
+        r.editor.capture(r.banks, visible);
+        r.trace_slot_event("editor-store", r.editor.active_page(),
+                           visible, visible, 0, true);
         r.write(r.exe(kSavedSlots), r.banks.slots(eqs::Page::Primary));
         r.save_extra_pages();
         r.editor.end();
