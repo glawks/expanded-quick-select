@@ -69,6 +69,13 @@
         }
       ],
       "description": "Number of Quick Select pages (1-8). Restart the game after changing."
+    },
+    {
+      "key": "compat_trace",
+      "name": "Log Quick Select interoperability diagnostics",
+      "description": "Debug only: log editor page changes and native slot rewrites by the shared hook chain. Does not change or block weapon assignments. Maximum 64 events per game session.",
+      "type": "bool",
+      "default": false
     }
   ],
   "license": "MIT",
