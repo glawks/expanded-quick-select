@@ -1,5 +1,6 @@
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/compat_api.h"
+#include "expanded_quick_select/interop_diagnostics.hpp"
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/editor_hint.hpp"
 #include "expanded_quick_select/gameplay_hint.hpp"
@@ -144,6 +145,16 @@ int main() {
     assert(!editor.switch_page(expanded, false, true, first));
     assert(editor.active_page() == Page::Primary);
     editor.end();
+
+    // Diagnostics must count, never reject, shared-hook rewrites.
+    const Slots trace_before{{1, 2, 3, 4, 5, 6, 7, 8}};
+    const Slots one_change{{1, 2, 18, 4, 5, 6, 7, 8}};
+    const Slots full_rewrite{{18, 17, 16, 15, 14, 13, 12, 11}};
+    assert(changed_native_slots(trace_before, trace_before) == 0);
+    assert(changed_native_slots(trace_before, one_change) == 1);
+    assert(changed_native_slots(trace_before, full_rewrite) == 8);
+    // This helper never mutates the original assignments.
+    assert(trace_before == Slots({{1, 2, 3, 4, 5, 6, 7, 8}}));
 
     // Pure C interface stays fixed width and uses explicit inactive sentinel.
     static_assert(sizeof(eqs_compat_state_v1) == 20, "compat state ABI changed");
