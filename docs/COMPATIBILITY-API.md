@@ -37,17 +37,22 @@ capabilities require agreement with the custom-weapon developer and a new
 backward-compatible persistence strategy. Do not reinterpret version 1's
 `native_ids` as logical keys.
 
-## Defensive editor handling
+## Editor compatibility status
 
-In this branch, **secondary pages only** validate modifications after the
-native slot-update chain. Without a Cross assignment, changes are rejected;
-with Cross, more than two changed slots are rejected and the previously
-selected page is restored. This is a guard against bulk rewrites such as a
-plugin restoring its original eight-slot registry. It does **not** intercept
-all possible hook orders or provide full Revolverator compatibility.
+The earlier experimental safeguard against bulk native-slot writes was
+**removed** after live testing showed that it prevented normal secondary
+wheel assignments with Revolverator installed. The editor now uses its
+unchanged v1.0.2 update/capture behavior.
 
-The normal page-one Quick Select is not subject to the secondary-page guard.
+This branch does **not yet fix** Revolverator's overlapping eight-slot
+registry, page duplication, custom icon rendering, or independent per-page
+custom-weapon identity. Resolving those issues requires a deliberate
+cross-mod contract; do not assume that the read-only API alone provides
+compatibility.
+
 The page-two legacy sidecar format and all other page files are unchanged.
+If experimental testing has already saved an empty page, updating the plugin
+cannot reconstruct those assignments. Restore backed-up EQS data if needed.
 
 ## Validation before release
 
