@@ -555,6 +555,12 @@ void load(openrac::Mod& mod) {
         if (editing) {
             pressed = r.mod.memory().read<std::uint32_t>(r.exe(kPadState) + 0x1C4);
             const auto visible = r.read(page + 0x30);
+            if (r.compat_trace) {
+                // A plugin outside this hook may rewrite the editor after our
+                // previous capture; compare before invoking the hook chain.
+                r.trace_slot_event("editor-entry/bank", r.editor.active_page(),
+                                   r.editor.visible_slots(r.banks), visible, pressed);
+            }
             if (r.editor.switch_page(r.banks, (pressed & kL2) != 0,
                                      (pressed & kR2) != 0, visible)) {
                 const auto& next = r.editor.visible_slots(r.banks);
