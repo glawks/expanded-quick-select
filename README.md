@@ -15,6 +15,7 @@ The number of wheels is adjustable in the OpenRAC launcher, with **two wheels en
 - **Input protection** to prevent Quick Select shoulder-button navigation from triggering an unwanted airborne slam.
 - **Android touchscreen navigation:** Contextual L2/R2 page buttons appear when editing a Quick Select loadout with multiple wheels; the existing L1/R1 slot controls remain unchanged.
 - **Standalone operation**; no dependency on the separate Weapon Wheel Pause mod.
+- **Optional compatibility API v1** for other mods to query the current Quick Select page and its native slots without altering saved assignments.
 
 ## Installation
 
@@ -82,6 +83,24 @@ You can also load and save while the mod is disabled, then enable it again; the 
 | **Android ARM64** | **Tested in-game by a user:** mod functions with L2/R2 touchscreen page controls; additional device configurations and save persistence remain to be tested |
 
 The mod has also been tested alongside the separate **Weapon Wheel Pause** mod. Expanded Quick Select does **not** require it and does not bundle or alter its code.
+
+### Optional custom-weapon interoperability (v1.0.3)
+
+EQS now exports a **read-only C API v1** for compatible mods to discover which
+gameplay/editor wheel is active and to read the eight native weapon IDs on a page.
+A narrowly scoped HUD check also tolerates the original Walloper's icon (60018)
+and Revolverator's icon (60037) on their shared native carrier ID 18.
+
+**This does not add separate custom-weapon assignments to secondary wheels.**
+Revolverator's unique weapon key (0x10012) remains distinct from the native ID
+18, and the API deliberately does not claim otherwise. Revolverator's optional
+integration is still under testing, including a known post-respawn icon issue;
+its separate death-related ammo-capacity issue predates this integration.
+
+The API and HUD adjustment are safe to use without Revolverator installed and
+do not change existing EQS save formats. See the
+[compatibility API guide](docs/COMPATIBILITY-API.md) for developers.
+
 
 Cross-platform **build success does not guarantee in-game compatibility**. Please report any issues with your operating system, RAC1 game version, and OpenRAC log.
 
