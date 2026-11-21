@@ -1,4 +1,6 @@
 #include "expanded_quick_select/sessions.hpp"
+#include "expanded_quick_select/compat_api.h"
+#include "expanded_quick_select/hud_icon_compat.hpp"
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/editor_hint.hpp"
 #include "expanded_quick_select/gameplay_hint.hpp"
@@ -143,6 +145,21 @@ int main() {
     assert(!editor.switch_page(expanded, false, true, first));
     assert(editor.active_page() == Page::Primary);
     editor.end();
+
+    // The native Walloper carrier can display either its own icon or
+    // Revolverator's custom icon. Never tolerate unrelated mismatches.
+    assert(hud_icon_compatible(18, 60018, 60018));
+    assert(hud_icon_compatible(18, 60018, 60037));
+    assert(hud_icon_compatible(18, 60037, 60018));
+    assert(hud_icon_compatible(18, 60037, 60037));
+    assert(hud_icon_compatible(0, 0, 0));
+    assert(!hud_icon_compatible(18, 12345, 60037));
+    assert(!hud_icon_compatible(18, 60018, 12345));
+    assert(!hud_icon_compatible(19, 60018, 60037));
+    assert(!hud_icon_compatible(2, 60037, 60018));
+    static_assert(sizeof(eqs_compat_state_v1) == 20, "EQS state ABI changed");
+    static_assert(sizeof(eqs_compat_slots_v1) == 40, "EQS slots ABI changed");
+    assert(EQS_COMPAT_NO_PAGE == UINT32_MAX);
 
     assert(valid_game_slots(first));
     assert(!valid_game_slots(Slots{{1, 2, 3, 4, 40, 6, 7, 8}}));
