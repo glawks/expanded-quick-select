@@ -4,6 +4,8 @@
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
+#include "expanded_quick_select/compat_api.h"
+#include "expanded_quick_select/hud_icon_compat.hpp"
 #include "openrac/games/rac1.hpp"
 #include "openrac/mod.hpp"
 #include <array>
@@ -152,11 +154,13 @@ public:
         for (std::size_t i = 0; i < 8; ++i) {
             const auto id = static_cast<openrac::gaddr>(previous_slots[i]);
             const bool id_matches = previous_cache[i].item == previous_slots[i];
-            const bool icon_matches = id == 0 || previous_cache[i].icon ==
+            const auto live_icon = id == 0 ? std::uint16_t{} :
                 mem.read<std::uint16_t>(definitions + id * 0x4C + 0x38);
+            const bool icon_matches = eqs::hud_icon_compatible(
+                previous_slots[i], previous_cache[i].icon, live_icon);
             if (!id_matches || !icon_matches) {
                 if (!r.warned_layout) {
-                    r.mod.warn("Quick Select HUD layout mismatch; page 2 projection disabled");
+                    r.mod.warn("Quick Select HUD layout mismatch; secondary page projection disabled");
                     r.warned_layout = true;
                 }
                 return;
@@ -364,6 +368,38 @@ private:
 
 std::unique_ptr<Runtime> runtime;
 
+// Read-only C ABI for optional cooperating mods. Slots remain native IDs.
+int compat_get_state(eqs_compat_state_v1* out) {
+    if (!runtime || !out || out->size < sizeof(eqs_compat_state_v1)) return 0;
+    const auto& r = *runtime;
+    eqs_compat_state_v1 state{};
+    state.size = sizeof(state);
+    state.page_count = static_cast<std::uint32_t>(r.banks.page_count());
+    state.gameplay_page = r.banks.wheel_open()
+        ? static_cast<std::uint32_t>(eqs::page_index(r.banks.active_page()))
+        : EQS_COMPAT_NO_PAGE;
+    state.editor_page = r.editor.active()
+        ? static_cast<std::uint32_t>(eqs::page_index(r.editor.active_page()))
+        : EQS_COMPAT_NO_PAGE;
+    state.flags = (r.banks.wheel_open() ? EQS_COMPAT_GAMEPLAY_OPEN : 0u)
+                | (r.editor.active() ? EQS_COMPAT_EDITOR_OPEN : 0u);
+    *out = state;
+    return 1;
+}
+int compat_get_slots(std::uint32_t page, eqs_compat_slots_v1* out) {
+    if (!runtime || !out || out->size < sizeof(eqs_compat_slots_v1) ||
+        page >= runtime->banks.page_count()) return 0;
+    eqs_compat_slots_v1 slots{};
+    slots.size = sizeof(slots);
+    slots.count = 8;
+    const auto& native = runtime->banks.slots(eqs::page_at(page));
+    for (std::size_t i = 0; i < native.size(); ++i) slots.native_ids[i] = native[i];
+    *out = slots;
+    return 1;
+}
+const eqs_compat_api_v1 compat_api{sizeof(eqs_compat_api_v1),
+    EQS_COMPAT_API_VERSION_1, compat_get_state, compat_get_slots};
+
 void load(openrac::Mod& mod) {
     if (mod.game() != "rac1" || (mod.version() != "pal" && mod.version() != "ntsc"))
         throw openrac::Error("Expanded Quick Select requires RAC1 PAL or NTSC-U");
@@ -524,6 +560,16 @@ void load(openrac::Mod& mod) {
              " wheel(s); L1/R1 gameplay, L2/R2 pause editor");
 }
 } // namespace
+
+// Discover from the already loaded module; never instantiate a second mod.
+#if defined(_WIN32)
+extern "C" __declspec(dllexport)
+#else
+extern "C" __attribute__((visibility("default")))
+#endif
+const eqs_compat_api_v1* openrac_expanded_quick_select_query(std::uint32_t version) {
+    return version == EQS_COMPAT_API_VERSION_1 && runtime ? &compat_api : nullptr;
+}
 
 OPENRAC_MOD_CPP(expanded_quick_select::kModId,
                 expanded_quick_select::kModVersion, load)
