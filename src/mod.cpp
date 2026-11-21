@@ -6,6 +6,7 @@
 #include "expanded_quick_select/slot_store.hpp"
 #include "expanded_quick_select/compat_api.h"
 #include "expanded_quick_select/interop_diagnostics.hpp"
+#include "expanded_quick_select/hud_icon_compat.hpp"
 #include "openrac/games/rac1.hpp"
 #include "openrac/mod.hpp"
 #include <array>
@@ -185,11 +186,21 @@ public:
         for (std::size_t i = 0; i < 8; ++i) {
             const auto id = static_cast<openrac::gaddr>(previous_slots[i]);
             const bool id_matches = previous_cache[i].item == previous_slots[i];
-            const bool icon_matches = id == 0 || previous_cache[i].icon ==
+            const auto live_icon = id == 0 ? std::uint16_t{} :
                 mem.read<std::uint16_t>(definitions + id * 0x4C + 0x38);
+            const bool icon_matches = eqs::hud_icon_compatible(
+                previous_slots[i], previous_cache[i].icon, live_icon);
             if (!id_matches || !icon_matches) {
                 if (!r.warned_layout) {
-                    r.mod.warn("Quick Select HUD layout mismatch; page 2 projection disabled");
+                    if (r.compat_trace) {
+                        r.mod.warn("Quick Select HUD mismatch: slot=" +
+                            std::to_string(i + 1) +
+                            " saved_item=" + std::to_string(previous_slots[i]) +
+                            " cached_item=" + std::to_string(previous_cache[i].item) +
+                            " cached_icon=" + std::to_string(previous_cache[i].icon) +
+                            " live_icon=" + std::to_string(live_icon));
+                    }
+                    r.mod.warn("Quick Select HUD layout mismatch; secondary page projection disabled");
                     r.warned_layout = true;
                 }
                 return;
