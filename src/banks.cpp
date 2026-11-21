@@ -28,6 +28,7 @@ bool Banks::set_slot(Page page, std::size_t index, std::int32_t item) noexcept {
 }
 
 Page Banks::active_page() const noexcept { return active_; }
+bool Banks::wheel_open() const noexcept { return wheel_open_; }
 
 void Banks::open_wheel() noexcept {
     wheel_open_ = true;
