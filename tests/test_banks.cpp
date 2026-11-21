@@ -17,12 +17,15 @@ int main() {
     assert(banks.slots(Page::Primary) == original);
     assert(banks.slots(Page::Secondary) == Slots{});
 
+    // The optional API should report the actual gameplay-wheel state.
+    assert(!banks.wheel_open());
     // Shoulder buttons do nothing outside the wheel.
     assert(!banks.switch_on_press(true, false));
     assert(banks.active_page() == Page::Primary);
     banks.switch_on_press(false, false);
 
     banks.open_wheel();
+    assert(banks.wheel_open());
     assert(banks.switch_on_press(false, true));
     assert(banks.active_page() == Page::Secondary);
     assert(!banks.switch_on_press(false, true)); // held R1 cannot flip back
@@ -50,6 +53,7 @@ int main() {
     assert(banks.slots(Page::Secondary)[0] == 0);
 
     banks.close_wheel();
+    assert(!banks.wheel_open());
     assert(!banks.switch_on_press(false, true));
     banks.open_wheel();
     assert(banks.active_page() == Page::Primary);
