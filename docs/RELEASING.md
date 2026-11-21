@@ -17,10 +17,10 @@ individual platform ZIPs plus one combined installable ZIP and SHA256SUMS.
 5. Merge the tested development branch into **`main`** and ensure main's CI passes.
 6. Publish one of two ways:
    - **From a local checkout:** tag the tested main commit with
-     `git tag v1.0.2`, then run `git push origin v1.0.2`.
+     `git tag v1.0.3`, then run `git push origin v1.0.3`.
    - **From GitHub Actions:** create a new commit on main with the exact
-     subject `release: publish v1.0.2`. The release job runs the full build
-     checks, creates `v1.0.2` on that verified commit, and publishes the
+     subject `release: publish v1.0.3`. The release job runs the full build
+     checks, creates `v1.0.3` on that verified commit, and publishes the
      release. Ordinary commits do not trigger publication. This works
      despite GitHub suppressing tag-triggered workflows for tags created
      with its built-in `GITHUB_TOKEN`.
@@ -41,7 +41,7 @@ and manual workflow runs **only** produce Actions artifacts.
 A release requires a successful merge job, matching tag/manifest versions,
 a combined ZIP containing all six platform libraries, the expected MIT
 licence, and matching SHA-256 hashes. Release notes are generated automatically.
-Prerelease suffixes (for example `v1.0.2-rc.1`) are marked as prereleases.
+Prerelease suffixes (for example `v1.0.3-rc.1`) are marked as prereleases.
 
 Do **not** upload or replace release ZIPs manually: OpenRAC validates archives
 against the release's `SHA256SUMS`. If CI fails, fix the source on
