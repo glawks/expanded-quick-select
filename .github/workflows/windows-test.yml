@@ -7,7 +7,7 @@ name: Cross-platform build and release
 
 on:
   push:
-    branches: [development, main, android-dev]
+    branches: [development, main, android-dev, release-v1.0.3]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -256,7 +256,7 @@ jobs:
 
           **Controls:** Hold Triangle and press L1/R1 to switch wheels. In the pause-menu Quick Select editor, use L2/R2. Choose 1–8 wheels in the mod's launcher settings (default: 2).
 
-          **New in v1.0.2:** Android ARM64 support and context-sensitive on-screen L2/R2 buttons to switch Quick Select editor pages; regular L1/R1 slot selection stays unchanged.
+          **New in v1.0.3:** Optional read-only cross-mod compatibility API v1 to expose active Quick Select pages and native slots. HUD validation also recognises the known native Walloper/Revolverator carrier icon pair while preserving checks for other weapons. No save format, controls or page assignments were changed. Separate logical Revolverator bindings on secondary wheels and post-respawn custom icons remain unsupported.
 
           **Compatibility:** Windows NTSC-U and Android ARM64 have been confirmed working in-game. PAL and Linux/macOS still need in-game testing. All six native builds passed automated checks.
 
