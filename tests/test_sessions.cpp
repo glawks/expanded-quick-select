@@ -1,6 +1,7 @@
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/compat_api.h"
 #include "expanded_quick_select/interop_diagnostics.hpp"
+#include "expanded_quick_select/hud_icon_compat.hpp"
 #include "expanded_quick_select/input_filter.hpp"
 #include "expanded_quick_select/editor_hint.hpp"
 #include "expanded_quick_select/gameplay_hint.hpp"
@@ -155,6 +156,19 @@ int main() {
     assert(changed_native_slots(trace_before, full_rewrite) == 8);
     // This helper never mutates the original assignments.
     assert(trace_before == Slots({{1, 2, 3, 4, 5, 6, 7, 8}}));
+
+    // Revolverator can swap the live definition of its Walloper carrier
+    // without rebuilding the cached quick-select icon. Native item identity
+    // must still match before the page projection is allowed.
+    assert(hud_icon_compatible(18, 60018, 60018));
+    assert(hud_icon_compatible(18, 60018, 60037));
+    assert(hud_icon_compatible(18, 60037, 60018));
+    assert(hud_icon_compatible(18, 60037, 60037));
+    assert(hud_icon_compatible(0, 0, 0));
+    assert(!hud_icon_compatible(18, 12345, 60037));
+    assert(!hud_icon_compatible(18, 60018, 12345));
+    assert(!hud_icon_compatible(19, 60018, 60037));
+    assert(!hud_icon_compatible(2, 60037, 60018));
 
     // Pure C interface stays fixed width and uses explicit inactive sentinel.
     static_assert(sizeof(eqs_compat_state_v1) == 20, "compat state ABI changed");
