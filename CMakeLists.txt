@@ -23,6 +23,10 @@ if(BUILD_TESTING)
     target_link_libraries(test_slot_store PRIVATE expanded_quick_select_core)
     add_test(NAME slot_store COMMAND test_slot_store)
 
+    add_executable(test_rac2_input tests/test_rac2_input.cpp)
+    target_include_directories(test_rac2_input PRIVATE include)
+    add_test(NAME rac2_input COMMAND test_rac2_input)
+
     add_executable(test_sessions tests/test_sessions.cpp)
     target_link_libraries(test_sessions PRIVATE expanded_quick_select_core)
     add_test(NAME sessions COMMAND test_sessions)
@@ -43,7 +47,7 @@ if(BUILD_OPENRAC_MOD)
     find_package(OpenRACMod 1.0 REQUIRED)
     openrac_add_mod(expanded_quick_select
         MANIFEST openrac-mod.json
-        SOURCES src/mod.cpp)
+        SOURCES src/mod.cpp src/rac2.cpp)
     target_link_libraries(expanded_quick_select PRIVATE expanded_quick_select_core)
 
     # openrac_add_mod copies only the plugin, manifest, README and LICENSE.

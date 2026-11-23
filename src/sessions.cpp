@@ -45,9 +45,9 @@ bool EditorSession::switch_page(Banks& banks, bool l2_pressed,
     return true;
 }
 
-bool valid_game_slots(const Slots& items) noexcept {
+bool valid_game_slots(const Slots& items, std::int32_t max_item_id) noexcept {
     for (const auto item : items) {
-        if (item < 0 || item > 39) return false;
+        if (item < 0 || item > max_item_id) return false;
     }
     return true;
 }

@@ -4,12 +4,15 @@
   "name": "Expanded Quick Select",
   "version": "1.0.3",
   "author": "glawks",
-  "description": "Configurable 1-8 independently editable Quick Select weapon wheels for Ratchet & Clank 1.",
+  "description": "Configurable multi-page Quick Select for RAC1; experimental RAC2 gameplay support (rac2dev).",
   "type": "native",
   "api": "1.13",
   "games": {
     "rac1": [
       "pal",
+      "ntsc"
+    ],
+    "rac2": [
       "ntsc"
     ]
   },
@@ -26,7 +29,8 @@
     "rac1.save.restore",
     "rac1.save.new_game",
     "rac1.menu.quick_select.draw",
-    "rac1.menu.item_text.draw"
+    "rac1.menu.item_text.draw",
+    "rac2.item.give"
   ],
   "settings": [
     {
@@ -69,6 +73,16 @@
         }
       ],
       "description": "Number of Quick Select pages (1-8). Restart the game after changing."
+    },
+    {
+      "key": "rac2_experimental",
+      "name": "Enable experimental RAC2 pages",
+      "type": "bool",
+      "default": false,
+      "games": [
+        "rac2"
+      ],
+      "description": "NTSC-U development only: attempt gameplay wheel page switching and fill extra pages from new weapons. RAC2 pause-menu editing is not available. Back up saves."
     }
   ],
   "license": "MIT",

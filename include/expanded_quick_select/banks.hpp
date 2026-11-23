@@ -24,7 +24,7 @@ constexpr Page page_at(std::size_t index) noexcept {
 
 class Banks {
 public:
-    explicit Banks(Slots primary = {});
+    explicit Banks(Slots primary = {}, std::int32_t max_item_id = 39);
 
     void set_page_count(std::size_t count) noexcept;
     std::size_t page_count() const noexcept;
@@ -46,6 +46,7 @@ public:
 
 private:
     std::array<Slots, kMaxPages> pages_{};
+    std::int32_t max_item_id_ = 39;
     std::size_t count_ = 2;
     Page active_ = Page::Primary;
     bool wheel_open_ = false;

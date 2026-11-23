@@ -7,7 +7,7 @@ name: Cross-platform build and release
 
 on:
   push:
-    branches: [development, main, android-dev]
+    branches: [development, main, android-dev, rac2dev]
     tags: ["v*"]
   workflow_dispatch:
 

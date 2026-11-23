@@ -1,4 +1,5 @@
 #include "expanded_quick_select/identity.hpp"
+#include "expanded_quick_select/rac2.hpp"
 #include "expanded_quick_select/editor_hint.hpp"
 #include "expanded_quick_select/gameplay_hint.hpp"
 #include "expanded_quick_select/input_filter.hpp"
@@ -401,6 +402,10 @@ const eqs_compat_api_v1 compat_api{sizeof(eqs_compat_api_v1),
     EQS_COMPAT_API_VERSION_1, compat_get_state, compat_get_slots};
 
 void load(openrac::Mod& mod) {
+    if (mod.game() == "rac2") {
+        expanded_quick_select::load_rac2(mod);
+        return;
+    }
     if (mod.game() != "rac1" || (mod.version() != "pal" && mod.version() != "ntsc"))
         throw openrac::Error("Expanded Quick Select requires RAC1 PAL or NTSC-U");
     if (mod.api_minor() < 13)

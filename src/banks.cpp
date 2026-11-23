@@ -2,7 +2,10 @@
 
 namespace expanded_quick_select {
 
-Banks::Banks(Slots primary) { pages_[0] = primary; }
+Banks::Banks(Slots primary, std::int32_t max_item_id)
+    : max_item_id_(max_item_id >= 0 && max_item_id <= 255 ? max_item_id : 39) {
+    pages_[0] = primary;
+}
 
 void Banks::set_page_count(std::size_t count) noexcept {
     count_ = count < 1 ? 1 : count > kMaxPages ? kMaxPages : count;
@@ -21,7 +24,7 @@ const Slots& Banks::slots(Page page) const noexcept {
 }
 
 bool Banks::set_slot(Page page, std::size_t index, std::int32_t item) noexcept {
-    if (page_index(page) >= kMaxPages || index >= Slots{}.size() || item < 0 || item > 39)
+    if (page_index(page) >= kMaxPages || index >= Slots{}.size() || item < 0 || item > max_item_id_)
         return false;
     pages_[page_index(page)][index] = item;
     return true;

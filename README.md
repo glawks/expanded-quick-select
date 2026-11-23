@@ -4,6 +4,8 @@
 
 The number of wheels is adjustable in the OpenRAC launcher, with **two wheels enabled by default**. Switch between them using the shoulder buttons, or configure your weapons from the game's existing pause-menu editor. Your assignments are saved separately for each game save slot.
 
+> **RAC2 development:** The `rac2dev` branch contains an experimental, opt-in NTSC-U RAC2 gameplay implementation. It is **not part of the released RAC1 build**, and RAC2 pause-menu editing is not implemented. See [RAC2 development notes](docs/RAC2-DEV.md).
+
 ## Features
 
 - **1–8 weapon wheels** (up to 64 Quick Select slots), selectable in the mod's launcher settings.

@@ -22,13 +22,12 @@ constexpr std::size_t kBodySize = 4 + 2 + 2 + 4 * kItemCount;
 constexpr std::size_t kFileSize = kBodySize + 4;
 constexpr int kMaxSaveSlot = 127;
 // RAC1's quick-select item table is indexed by actual item IDs 0..39.
-constexpr std::int32_t kMaxItemId = 39;
 using Bytes = std::array<std::uint8_t, kFileSize>;
 
 bool valid_slot(int slot) { return slot >= 0 && slot <= kMaxSaveSlot; }
-bool valid_items(const Slots& items) {
+bool valid_items(const Slots& items, std::int32_t max_item_id) {
     for (const std::int32_t id : items) {
-        if (id < 0 || id > kMaxItemId) return false;
+        if (id < 0 || id > max_item_id) return false;
     }
     return true;
 }
@@ -67,7 +66,7 @@ Bytes encode(const Slots& slots) {
     return bytes;
 }
 
-std::optional<Slots> decode(const Bytes& bytes) {
+std::optional<Slots> decode(const Bytes& bytes, std::int32_t max_item_id) {
     if (bytes[0] != 'E' || bytes[1] != 'Q' || bytes[2] != 'S' || bytes[3] != '1'
         || bytes[4] != 1 || bytes[5] != 0 || bytes[6] != 0 || bytes[7] != 0
         || get_u32(bytes, kBodySize) != checksum(bytes)) {
@@ -76,7 +75,7 @@ std::optional<Slots> decode(const Bytes& bytes) {
     Slots slots{};
     for (std::size_t i = 0; i < kItemCount; ++i) {
         const std::uint32_t item = get_u32(bytes, 8 + i * 4);
-        if (item > static_cast<std::uint32_t>(kMaxItemId)) return std::nullopt;
+        if (item > static_cast<std::uint32_t>(max_item_id)) return std::nullopt;
         slots[i] = static_cast<std::int32_t>(item);
     }
     return slots;
@@ -94,8 +93,9 @@ bool replace_file(const fs::path& source, const fs::path& destination) {
 }
 } // namespace
 
-SlotStore::SlotStore(fs::path mod_data_dir)
-    : mod_data_dir_(std::move(mod_data_dir)) {}
+SlotStore::SlotStore(fs::path mod_data_dir, std::int32_t max_item_id)
+    : mod_data_dir_(std::move(mod_data_dir)),
+      max_item_id_(max_item_id >= 0 && max_item_id <= 255 ? max_item_id : 39) {}
 
 fs::path SlotStore::path_for(int save_slot, Page page) const {
     const auto prefix = "save-slot-" + std::to_string(save_slot);
@@ -118,7 +118,7 @@ std::optional<Slots> SlotStore::load(int save_slot, Page page) const {
         || stream.peek() != std::char_traits<char>::eof()) {
         return std::nullopt;
     }
-    return decode(bytes);
+    return decode(bytes, max_item_id_);
 }
 
 bool SlotStore::save(int save_slot, const Slots& secondary) const {
@@ -126,7 +126,7 @@ bool SlotStore::save(int save_slot, const Slots& secondary) const {
 }
 bool SlotStore::save(int save_slot, Page page, const Slots& secondary) const {
     if (!valid_slot(save_slot) || page_index(page) == 0 ||
-        page_index(page) >= kMaxPages || !valid_items(secondary) ||
+        page_index(page) >= kMaxPages || !valid_items(secondary, max_item_id_) ||
         mod_data_dir_.empty()) {
         return false;
     }

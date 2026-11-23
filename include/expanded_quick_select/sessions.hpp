@@ -34,6 +34,6 @@ private:
 };
 
 // Only valid item IDs may be projected into the game's icon lookup table.
-bool valid_game_slots(const Slots& items) noexcept;
+bool valid_game_slots(const Slots& items, std::int32_t max_item_id = 39) noexcept;
 
 } // namespace expanded_quick_select

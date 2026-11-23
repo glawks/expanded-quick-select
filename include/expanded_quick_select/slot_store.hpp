@@ -11,7 +11,7 @@ namespace expanded_quick_select {
 // are intentionally unchanged, so upgrading from v0.1.6 cannot lose it.
 class SlotStore {
 public:
-    explicit SlotStore(std::filesystem::path mod_data_dir);
+    explicit SlotStore(std::filesystem::path mod_data_dir, std::int32_t max_item_id = 39);
 
     std::optional<Slots> load(int save_slot) const;
     bool save(int save_slot, const Slots& secondary) const;
@@ -21,6 +21,7 @@ public:
 private:
     std::filesystem::path path_for(int save_slot, Page page) const;
     std::filesystem::path mod_data_dir_;
+    std::int32_t max_item_id_ = 39;
 };
 
 } // namespace expanded_quick_select

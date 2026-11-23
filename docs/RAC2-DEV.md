@@ -1,0 +1,65 @@
+# RAC2 support (experimental: rac2dev)
+
+This branch keeps the tested RAC1 implementation intact and adds a separate
+NTSC-U (v1.01) RAC2 runtime. It is **not a finished RAC2 release**.
+
+## Implemented so far
+
+- Multi-game manifest and runtime dispatch; the existing RAC1 branch remains unchanged.
+- Game-specific maximum item ID (55 for RAC2, 39 for RAC1), with core tests.
+- RAC2 sidecar data under the mod's `rac2/` folder, separate from RAC1's files.
+- Opt-in Triangle + L1/R1 page switching using the SDK's active-low pad callback.
+- A guarded, single-game-tick projection of RAC2's eight native Quick Select slots
+  and its eight-entry HUD icon cache, with restoration after each game tick.
+- New items in the game's inventory weapon/gadget order are put into the first
+  empty extra-wheel slot if they are not already on a page.
+- A HUD text hint shows the current page; page-1 canonical save data is intended
+  to remain untouched.
+
+## Important limits / test warnings
+
+- **RAC2 support is OFF by default** under the launcher setting
+  `Enable experimental RAC2 pages`. Enable only to test; back up saves first.
+- **Only NTSC-U v1.01** is declared. PAL and NTSC-U v2.00 have not been mapped.
+- The wheel/pause-menu code does not have dedicated RAC2 Quick Select hooks in
+  SDK 1.20.0; this first attempt uses `on_pad`, `on_frame`, and `Item_Give`.
+  The pad-to-frame timing and exact HUD cache lifetime require in-game testing.
+- **The pause-menu Quick Select editor is not ported.** Extra pages presently
+  populate automatically on acquiring eligible weapons/gadgets, not through
+  a fully featured editor. Existing saved extras load from the sidecars.
+- On a HUD cache mismatch, the implementation skips writing game memory and
+  warns once. This may prevent page switching until the correct cache
+  relocation/layout is confirmed.
+- The read-only EQS compatibility ABI remains RAC1-only in this prototype.
+
+## Memory evidence (RAC2 NTSC-U v1.01)
+
+Based on OpenRAC's `port/game/rac2-ntsc/host/rac2_addresses.h`
+and `OpenRAC/rac2-decomp/nonmatching/game/func_0028BCE8.c`:
+
+| Data | Address / layout |
+| --- | --- |
+| Canonical eight item slots | `g_equippedItemSlots = 0x001A73B8` (8 × u32) |
+| HUD cache | `D_00255170` (8 × 0x1C; icon at +0, item at +0x18) |
+| Item-to-record index | `g_itemEquippedSlot = 0x00139568` (u8 per item) |
+| Item records | `g_weaponTable = 0x00239BA0` (0xE0 per record, u16 icon at +0x3C) |
+| Inventory order | `g_inventoryOrder = 0x001A7B68` (32 bytes, flagged items) |
+
+All addresses and their relocation must be verified live before wider support.
+
+## Suggested in-game test order
+
+1. Back up RAC2 saves. Enable only Expanded Quick Select and its RAC2
+   experimental setting, with two wheels.
+2. Confirm startup logging and no regression when the experimental setting is off.
+3. With items already equipped, hold Triangle and press R1. Verify the
+   page hint and whether the wheel icons switch. Hold R1 to test edge detection;
+   press L1 to go back. Try releasing Triangle while page 2 is active.
+4. Gain a *new* weapon with a full first wheel. Confirm it appears on page 2
+   and persists after reload. Test already-owned pickups as well.
+5. Test save/load, respawning, entering menus and swapping planets, and capture
+   the log, especially any 'RAC2 HUD cache mismatch' warning.
+
+**Next development milestone:** Add proper RAC2 wheel-update/draw and
+pause-editor hooks to OpenRAC, then replace the per-frame projection with
+scoped native hooks and add L2/R2 editor page switching.
