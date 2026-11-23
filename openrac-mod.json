@@ -6,7 +6,7 @@
   "author": "glawks",
   "description": "Configurable multi-page Quick Select for RAC1; experimental RAC2 gameplay support (rac2dev).",
   "type": "native",
-  "api": "1.13",
+  "api": "1.20",
   "games": {
     "rac1": [
       "pal",
