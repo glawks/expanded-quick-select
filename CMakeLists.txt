@@ -25,6 +25,7 @@ if(BUILD_TESTING)
 
     add_executable(test_rac2_input tests/test_rac2_input.cpp)
     target_include_directories(test_rac2_input PRIVATE include)
+    target_link_libraries(test_rac2_input PRIVATE expanded_quick_select_core)
     add_test(NAME rac2_input COMMAND test_rac2_input)
 
     add_executable(test_sessions tests/test_sessions.cpp)

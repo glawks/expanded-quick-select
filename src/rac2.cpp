@@ -38,7 +38,7 @@ using Cache = std::array<CacheEntry, 8>;
 class Runtime {
 public:
     explicit Runtime(openrac::Mod& m)
-        : mod(m), store(m.data_dir() / "rac2", kRac2MaxItemId),
+        : mod(m), store(std::filesystem::path(m.data_dir()) / "rac2", kRac2MaxItemId),
           banks({}, kRac2MaxItemId) {
         const auto count = m.setting<std::string>("wheel_count");
         banks.set_page_count(count.size() == 1 && count[0] >= '1' && count[0] <= '8'
