@@ -8,6 +8,7 @@
 #include <cassert>
 #include <chrono>
 #include <filesystem>
+#include <string>
 
 int main() {
     namespace eqs = expanded_quick_select;
