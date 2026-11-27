@@ -2,9 +2,9 @@
   "format": 2,
   "id": "expanded-quick-select",
   "name": "Expanded Quick Select",
-  "version": "1.0.3",
+  "version": "2.0.0-dev.1",
   "author": "glawks",
-  "description": "Configurable multi-page Quick Select for RAC1; experimental RAC2 gameplay support (rac2dev).",
+  "description": "Development: RAC1 native wheel and optional Weapon Wheel Pause bridge; experimental RAC2 prototype.",
   "type": "native",
   "api": "1.20",
   "games": {

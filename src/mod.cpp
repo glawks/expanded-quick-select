@@ -6,6 +6,13 @@
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
 #include "expanded_quick_select/compat_api.h"
+#include "expanded_quick_select/wheel_bridge.h"
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 #include "expanded_quick_select/hud_icon_compat.hpp"
 #include "openrac/games/rac1.hpp"
 #include "openrac/mod.hpp"
@@ -56,6 +63,7 @@ struct Runtime {
     openrac::gaddr editor_address = 0;
     bool warned_layout = false;
     bool label_visible = false;
+    bool external_wheel = false;
     // Acquired from the game's own menu-label hook when it runs.
     openrac::rac1::Menu_ItemText_Draw::fn menu_text_draw = nullptr;
     std::string footer_diagnostic;
@@ -126,6 +134,7 @@ struct Runtime {
     }
     void reset(bool new_game) {
         editor.end();
+        external_wheel = false;
         // Clear the on-screen page triggers when a save is restored or reset.
         mod.touch_hint("eqs_pages", false);
         editor_address = 0;
@@ -369,6 +378,56 @@ private:
 
 std::unique_ptr<Runtime> runtime;
 
+bool external_wheel_available() {
+#ifdef _WIN32
+    for (const auto name : {L"weapon_wheel_pause.dll", L"libweapon_wheel_pause.dll"}) {
+        if (const auto module = GetModuleHandleW(name)) {
+            using Ready = int (*)();
+            const auto ready = reinterpret_cast<Ready>(
+                GetProcAddress(module, "openrac_weapon_wheel_pause_eqs_bridge"));
+            if (ready && ready()) return true;
+        }
+    }
+#endif
+    return false;
+}
+
+int external_page(uint32_t event, uint32_t held, eqs_wheel_page_v2* out) {
+    if (!runtime) return 0;
+    auto& r = *runtime;
+    if (event == EQS_WHEEL_END) {
+        if (r.external_wheel) r.banks.close_wheel();
+        r.external_wheel = false;
+        r.label(false);
+        return 1;
+    }
+    if (!out || out->size < sizeof(*out)) return 0;
+    if (event == EQS_WHEEL_BEGIN) {
+        r.load_slot();
+        r.refresh_primary();
+        r.banks.close_wheel();
+        // Seed held buttons before opening: do not count an old press.
+        r.banks.switch_on_press((held & kL1) != 0, (held & kR1) != 0);
+        r.banks.open_wheel();
+        r.external_wheel = true;
+        r.label(false);
+    } else if (event == EQS_WHEEL_UPDATE && r.external_wheel && (held & kTriangle)) {
+        r.banks.switch_on_press((held & kL1) != 0, (held & kR1) != 0);
+    } else if (event != EQS_WHEEL_UPDATE && event != EQS_WHEEL_DRAW) {
+        return 0;
+    }
+    if (!r.external_wheel) return 0;
+    eqs_wheel_page_v2 page{};
+    page.size = sizeof(page);
+    page.page_index = static_cast<uint32_t>(eqs::page_index(r.banks.active_page()));
+    page.page_count = static_cast<uint32_t>(r.banks.page_count());
+    const auto& items = r.banks.slots(r.banks.active_page());
+    for (std::size_t i = 0; i < items.size(); ++i) page.native_ids[i] = items[i];
+    *out = page;
+    return 1;
+}
+
+
 // Read-only C ABI for optional cooperating mods. Slots remain native IDs.
 int compat_get_state(eqs_compat_state_v1* out) {
     if (!runtime || !out || out->size < sizeof(eqs_compat_state_v1)) return 0;
@@ -460,10 +519,12 @@ void load(openrac::Mod& mod) {
 
     mod.hook<openrac::rac1::Hud_QuickSelect_Init>([&r](auto original, std::uint32_t selector) {
         original(selector);
+        if (external_wheel_available()) return;
         r.load_slot();
         r.refresh_primary();
     });
     mod.hook<openrac::rac1::Hud_QuickSelect_Update>([&r](auto original, std::uint32_t selector) {
+        if (external_wheel_available()) { original(selector); return; }
         r.load_slot();
         const auto pad = r.exe(kPadState);
         const auto held = r.mod.memory().read<std::uint32_t>(pad + 0x1C0);
@@ -477,6 +538,7 @@ void load(openrac::Mod& mod) {
         r.label(triangle);
     });
     mod.hook<openrac::rac1::Hud_QuickSelect_Draw>([&r](auto original, std::uint32_t selector) {
+        if (external_wheel_available()) return original(selector);
         Projection projection(r);
         return original(selector);
     });
@@ -574,6 +636,16 @@ extern "C" __attribute__((visibility("default")))
 #endif
 const eqs_compat_api_v1* openrac_expanded_quick_select_query(std::uint32_t version) {
     return version == EQS_COMPAT_API_VERSION_1 && runtime ? &compat_api : nullptr;
+}
+
+#if defined(_WIN32)
+extern "C" __declspec(dllexport)
+#else
+extern "C" __attribute__((visibility("default")))
+#endif
+int openrac_eqs_wheel_page_v2(uint32_t event, uint32_t held, eqs_wheel_page_v2* out) {
+    try { return external_page(event, held, out); }
+    catch (...) { return 0; }
 }
 
 OPENRAC_MOD_CPP(expanded_quick_select::kModId,
