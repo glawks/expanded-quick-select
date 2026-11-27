@@ -22,7 +22,8 @@ inline std::int32_t order_item(std::uint8_t entry) noexcept {
 }
 // Never change the primary page or rearrange existing sidecar slots.
 inline Changed fill_owned_pages(Banks& banks, const Order& order,
-                                const Owned& owned) noexcept {
+                                const Owned& owned,
+                                const Changed& customised = {}) noexcept {
     Changed changed{};
     std::array<bool, kMaxItemId + 1> listed{};
     for (std::size_t p = 0; p < banks.page_count(); ++p) {
@@ -34,6 +35,7 @@ inline Changed fill_owned_pages(Banks& banks, const Order& order,
         const auto item = order_item(entry);
         if (!is_owned(owned, item) || listed[static_cast<std::size_t>(item)]) continue;
         for (std::size_t p = 1; p < banks.page_count(); ++p) {
+            if (customised[p]) continue;
             const auto& slots = banks.slots(page_at(p));
             const auto empty = std::find(slots.begin(), slots.end(), 0);
             if (empty == slots.end()) continue;

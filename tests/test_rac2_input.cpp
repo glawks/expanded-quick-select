@@ -79,6 +79,18 @@ int main() {
     assert(inv::fill_owned_pages(existing, order, owned) == inv::Changed{});
     assert(existing.slots(eqs::Page::Secondary) == expected_secondary);
 
+    // A manually cleared slot must remain empty; other pages still auto-fill.
+    existing.set_page_count(3);
+    existing.set_slot(eqs::Page::Secondary, 0, 0);
+    inv::Changed customised{};
+    customised[1] = true;
+    inv::fill_owned_pages(existing, order, owned, customised);
+    assert(existing.slots(eqs::Page::Secondary)[0] == 0);
+    std::uint8_t editor_report[] = {0xFF, 0x70, 0x80, 0x80};
+    ri::consume(editor_report, 4, ri::kL2 | ri::kR2 | ri::kSquare);
+    assert((ri::held(editor_report, 4) & (ri::kL2 | ri::kR2 | ri::kSquare)) == 0);
+    assert((ri::held(editor_report, 4) & ri::kShoulders) == ri::kShoulders);
+
     auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
     auto dir = std::filesystem::temp_directory_path() / ("eqs-rac2-" + std::to_string(suffix));
     eqs::SlotStore store(dir, 55);

@@ -139,3 +139,20 @@ abort. Add a compile-time regression test for this transition and log the
 native pending/equipped item on close. No additional hooks or changes to
 RAC1. The SDK 1.34.0 does not expose a RAC2 save-serialize hook; this remains
 an experimental short-lived projection, not a scoped native wheel hook.
+
+## Dev.9: experimental native pause editor
+
+Dev.8 confirmed native selections on pages two and three, including empty
+slots, and save/reload in the same process. Preserve its gameplay path.
+Identify the pause editor through the active page's registered input callback
+(func_002CD660, menu_handle_input_with_fallback) and initialised eight-slot
+cache. L2/R2 change page; native L1/R1 move the ring cursor and Cross assigns
+the selected item. Square clears the highlighted slot (native cursor+1).
+Capture native cache changes into the current page, restore the canonical
+primary page before native exit/sync, and disable automatic fill for edited
+extra pages. Edited pages save in a separate custom sidecar directory.
+The current host returns -1 for save slot: default is session-only, with an
+opt-in manually selected profile 1–4 (independent of host save slots) for
+restart persistence. The user must select the corresponding profile when
+switching saves until native save-slot reporting is available. In-game verify
+page callback recognition, cursor mapping, assignment, exit, and persistence.
