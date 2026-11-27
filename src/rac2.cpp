@@ -9,6 +9,7 @@
 #include "openrac/mod.hpp"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -26,6 +27,9 @@ constexpr openrac::gaddr kItemMap = 0x00139568;
 constexpr openrac::gaddr kItemRecords = 0x00239BA0;
 constexpr openrac::gaddr kInventoryOrder = 0x001A7B68;
 constexpr openrac::gaddr kInventoryOwned = 0x001A7AF8;
+// Native menu_is_state_seven() reads g_menu_saved_state (D_001BACC0).
+constexpr openrac::gaddr kMenuSavedState = 0x001BACC0;
+constexpr std::int32_t kWheelMenuMode = 7;
 constexpr std::int32_t kRac2MaxItemId = rac2_inventory::kMaxItemId;
 constexpr std::uint32_t kRecordStride = 0xE0;
 
@@ -57,7 +61,7 @@ public:
         last_l1 = l1;
         last_r1 = r1;
         const auto status = mod.play_status();
-        if (status.phase != OPENRAC_PLAY_PLAYING || mod.loaded_level() < 0) {
+        if (!wheel_phase(status)) {
             cancel_wheel(l1, r1);
             return;
         }
@@ -95,43 +99,69 @@ public:
     void on_frame() {
         restore();
         const auto status = mod.play_status();
-        if (status.phase != OPENRAC_PLAY_PLAYING || mod.loaded_level() < 0) {
-            cancel_wheel(false, false);
-            mod.hud_text_set({});
+        if (!wheel_phase(status)) {
+            cancel_wheel(last_l1, last_r1);
             return;
         }
         refresh_slot();
-        wheel.after_update(banks, last_triangle);
-        if (!last_triangle) {
+        // Native paused wheel commits the selection after its release/fade.
+        // Keep the selected page until the native mode exits, not just until
+        // the first pad report with Triangle released.
+        if (!last_triangle && !native_wheel_menu(status)) {
+            wheel.after_update(banks, false);
             wheel.before_update(banks, false, last_l1, last_r1);
-            sync_inventory();
+            if (status.phase == OPENRAC_PLAY_PLAYING) sync_inventory();
         }
-        if (!banks.wheel_open() || banks.page_count() < 2) {
-            mod.hud_text_set({});
-        } else {
-            openrac_hud_text line{};
-            const auto message = gameplay_page_hint(banks.active_page(), banks.page_count());
-            if (message.size() + 1 <= sizeof(line.text)) {
-                std::memcpy(line.text, message.c_str(), message.size() + 1);
-                line.x = 0.5f;
-                line.y = 0.81f;
-                line.scale = 0.62f;
-                line.rgba[0] = line.rgba[1] = line.rgba[2] = 220;
-                line.rgba[3] = 255;
-                line.flags = OPENRAC_HUD_SMALL | OPENRAC_HUD_SHADOW;
-                mod.hud_text_set({line});
-            }
-        }
+        visible_page.store(banks.wheel_open() && banks.page_count() > 1
+            ? static_cast<int>(page_index(banks.active_page()) + 1) : 0,
+            std::memory_order_relaxed);
+    }
+
+    // Unlike hud_text_set, this overlay is drawn over the native menu phase.
+    // Only the atomic page number crosses to the render callback.
+    void draw_overlay(const openrac_overlay* overlay) const {
+        const int page = visible_page.load(std::memory_order_relaxed);
+        if (!overlay || page == 0 || !overlay->text || !overlay->text_width) return;
+        const auto message = gameplay_page_hint(page_at(static_cast<std::size_t>(page - 1)),
+                                                banks.page_count());
+        constexpr float height = 12.0f;
+        const float width = overlay->text_width(overlay->context, height, message.c_str());
+        const float x = (512.0f - width) * 0.5f;
+        constexpr float y = 363.0f;
+        overlay->text(overlay->context, x + 1, y + 1, height, 0x000000CCu, message.c_str());
+        overlay->text(overlay->context, x, y, height, 0xDCDCDCFFu, message.c_str());
     }
 
     // Native grants must see the canonical slots; inventory sync happens later.
     void before_item_give() { restore(); }
 
 private:
+    bool native_wheel_menu(const openrac_play_status& status) const {
+        return mod.loaded_level() >= 0 &&
+            (status.phase == OPENRAC_PLAY_MENU || status.phase == OPENRAC_PLAY_PLAYING) &&
+            mod.memory().read<std::int32_t>(level_data(kMenuSavedState)) == kWheelMenuMode;
+    }
+
+    bool wheel_phase(const openrac_play_status& status) {
+        if (mod.loaded_level() < 0) return false;
+        if (status.phase == OPENRAC_PLAY_PLAYING) return true;
+        if (status.phase == OPENRAC_PLAY_MENU && banks.wheel_open()) {
+            const auto mode = mod.memory().read<std::int32_t>(level_data(kMenuSavedState));
+            if (mode != last_menu_mode) {
+                last_menu_mode = mode;
+                mod.info("RAC2: wheel entered menu phase; native mode " + std::to_string(mode));
+            }
+            return mode == kWheelMenuMode;
+        }
+        return false;
+    }
+
     void cancel_wheel(bool l1, bool r1) {
         banks.close_wheel();
         wheel.before_update(banks, false, l1, r1);
         last_triangle = false;
+        visible_page.store(0, std::memory_order_relaxed);
+        last_menu_mode = -1;
     }
 
     void sync_inventory() {
@@ -168,6 +198,7 @@ private:
             banks.set_page(page_at(p), store.load(slot, page_at(p)).value_or(Slots{}));
         }
         banks.close_wheel();
+        visible_page.store(0, std::memory_order_relaxed);
         mod.info("RAC2: loaded extra wheels for save slot " + std::to_string(slot));
     }
 
@@ -261,6 +292,8 @@ private:
     Banks banks;
     WheelSession wheel;
     int last_save_slot = -2;
+    int last_menu_mode = -1;
+    std::atomic<int> visible_page{0};
     bool last_triangle = false;
     bool last_l1 = false, last_r1 = false;
     bool warned_cache = false;
@@ -280,8 +313,8 @@ std::unique_ptr<Runtime> runtime;
 void load_rac2(openrac::Mod& mod) {
     if (mod.version() != "ntsc")
         throw openrac::Error("RAC2 experimental support is currently NTSC-U v1.01 only");
-    if (mod.api_minor() < 20)
-        throw openrac::Error("RAC2 dev build requires OpenRAC mod API 1.20+");
+    if (!mod.has_overlay_phases())
+        throw openrac::Error("RAC2 dev build requires OpenRAC mod API 1.31+");
     if (!mod.setting<bool>("rac2_experimental")) {
         mod.info("Expanded Quick Select RAC2 prototype is disabled; enable experimental RAC2 pages to test");
         return;
@@ -292,6 +325,11 @@ void load_rac2(openrac::Mod& mod) {
         r.on_pad(port, report, size);
     });
     mod.on_frame([&r]() { r.on_frame(); });
+    if (!mod.on_overlay_phases(
+            [](void* user, const openrac_overlay* overlay) {
+                static_cast<Runtime*>(user)->draw_overlay(overlay);
+            }, &r, OPENRAC_OVERLAY_PLAYING | OPENRAC_OVERLAY_MENU))
+        throw openrac::Error("RAC2 menu overlay registration refused");
     mod.hook<openrac::rac2::Item_Give>(
         [&r](auto original, std::int32_t item) {
             r.before_item_give();

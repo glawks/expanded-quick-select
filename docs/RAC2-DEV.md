@@ -70,3 +70,14 @@ native wheel hook. Back up saves before testing.
 **Next development milestone:** Add proper RAC2 wheel-update/draw and
 pause-editor hooks to OpenRAC, then replace the per-frame projection with
 scoped native hooks and add L2/R2 editor page switching.
+
+## Dev.3: native paused wheel
+
+Builds against SDK 1.34.0 (requires menu overlay API 1.31). The HUD text is
+now drawn by the menu-capable overlay rather than gameplay-only hud_text_set.
+An existing wheel session may continue in the menu phase when the native
+saved mode is 7 (D_001BACC0, menu_is_state_seven). The selected extra page
+remains active through the paused wheel's release animation. Other menu modes
+are rejected; the log records the observed native mode on transition.
+This does not yet supply dedicated native wheel hooks or guarantee all
+selection timings. Validate mode relocation and page switching in game.
