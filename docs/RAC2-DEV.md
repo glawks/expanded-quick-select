@@ -103,3 +103,14 @@ slots, page index zero, RAM bounds, canonical item IDs and icon values before
 projection. Extra-page icon values must also be valid. Log requested page,
 resolved cache/records on mismatch, successful validation, and inventory fill.
 Still experimental; no pause-editor or save-slot fallback changes.
+
+## Dev.6: decode owned inventory IDs
+
+Dev.5 confirmed live cache validation and switching. The inventory order uses
+six-bit IDs, not seven: help_store_id_in_slot_list (002883E8) adds 0x40 to
+owned entries; level_validate_item_list (002908D0) masks 0x3F. For example,
+0x5E is owned item 30, not item 94. Correct the mask, skip 0xFF, and still
+require the separate owned flag. Filter missing icons and the 0xEA7E icon
+rejected by the native ring editor. Test actual flagged list values and log
+eligible IDs and first raw list if unavailable. No changes to RAC1, projection
+or persistence.

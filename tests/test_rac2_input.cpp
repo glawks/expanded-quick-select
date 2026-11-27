@@ -45,7 +45,14 @@ int main() {
     owned[20] = 0;
     inv::Order order{};
     order.fill(0xFF);
-    const std::uint8_t entries[] = {1, 0x89, 9, 12, 10, 20, 127, 0, 11, 13, 14, 15, 16, 17, 55};
+    assert(inv::order_item(0x5E) == 30); // native owned starting item
+    assert(inv::order_item(0x6A) == 42);
+    assert(inv::order_item(0xC9) == 9);
+    assert(inv::order_item(0xFF) == 0);
+    // Real owned entries carry 0x40; mixed flags, unowned IDs and
+    // unused entries must not break automatic population.
+    const std::uint8_t entries[] = {0x41, 0x49, 0xC9, 0x4C, 0x4A, 0x54, 127, 0,
+                                    0x4B, 0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x77};
     std::copy(std::begin(entries), std::end(entries), order.begin());
     auto changes = inv::fill_owned_pages(existing, order, owned);
     assert(!changes[0] && changes[1] && changes[2]);

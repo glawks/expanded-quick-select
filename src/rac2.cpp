@@ -201,7 +201,34 @@ private:
         banks.set_primary(primary);
         const auto order = mem.read<rac2_inventory::Order>(mod.relocate(kInventoryOrder));
         const auto owned = mem.read<rac2_inventory::Owned>(mod.relocate(kInventoryOwned));
-        const auto changed = rac2_inventory::fill_owned_pages(banks, order, owned);
+        // The native list has six-bit IDs and ownership flags. Exclude
+        // entries the native ring editor would reject (no icon / 0xEA7E).
+        auto eligible = owned;
+        for (std::int32_t id = 1; id <= kRac2MaxItemId; ++id) {
+            if (!rac2_inventory::is_owned(owned, id)) continue;
+            const auto icon = icon_for(id);
+            if (icon == 0 || icon == 0xEA7E) eligible[static_cast<std::size_t>(id)] = 0;
+        }
+        if (!logged_inventory && std::any_of(primary.begin(), primary.end(),
+                                              [](auto item) { return item != 0; })) {
+            std::string ids;
+            for (auto entry : order) {
+                const auto id = rac2_inventory::order_item(entry);
+                if (rac2_inventory::is_owned(eligible, id))
+                    ids += " " + std::to_string(id);
+            }
+            if (!ids.empty() || !warned_inventory)
+                mod.info("RAC2: eligible owned list IDs:" + (ids.empty() ? std::string(" (none)") : ids));
+            // Retry logging when the inventory becomes available after loading.
+            logged_inventory = !ids.empty();
+            if (!logged_inventory && !warned_inventory) {
+                warned_inventory = true;
+                std::string raw;
+                for (auto entry : order) raw += " " + std::to_string(entry);
+                mod.info("RAC2: initial raw inventory list:" + raw);
+            }
+        }
+        const auto changed = rac2_inventory::fill_owned_pages(banks, order, eligible);
         for (std::size_t p = 1; p < banks.page_count(); ++p) {
             if (changed[p]) {
                 dirty_pages[p] = true;
@@ -229,6 +256,7 @@ private:
         warned_store = false;
         warned_cache = false;
         logged_projection = false;
+        logged_inventory = warned_inventory = false;
         wheel = WheelSession{};
         for (std::size_t p = 1; p < kMaxPages; ++p) {
             banks.set_page(page_at(p), store.load(slot, page_at(p)).value_or(Slots{}));
@@ -378,6 +406,7 @@ private:
     bool last_l1 = false, last_r1 = false;
     bool warned_cache = false;
     bool logged_projection = false;
+    bool logged_inventory = false, warned_inventory = false;
     bool projection_active = false;
     bool warned_store = false;
     std::array<bool, kMaxPages> dirty_pages{};

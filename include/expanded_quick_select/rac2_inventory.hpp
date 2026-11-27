@@ -14,7 +14,12 @@ inline bool is_owned(const Owned& owned, std::int32_t item) noexcept {
     return item > 0 && item <= kMaxItemId && owned[static_cast<std::size_t>(item)] != 0;
 }
 
-// Native order contains weapons/gadgets, with a flag in bit 7.
+// Native list entries encode a six-bit item ID; bit 6 marks ownership
+// and bit 7 is also outside the ID. 0xFF is an unused slot.
+// See RAC2 help_store_id_in_slot_list / level_validate_item_list.
+inline std::int32_t order_item(std::uint8_t entry) noexcept {
+    return entry == 0xFF ? 0 : static_cast<std::int32_t>(entry & 0x3F);
+}
 // Never change the primary page or rearrange existing sidecar slots.
 inline Changed fill_owned_pages(Banks& banks, const Order& order,
                                 const Owned& owned) noexcept {
@@ -26,8 +31,7 @@ inline Changed fill_owned_pages(Banks& banks, const Order& order,
         }
     }
     for (const auto entry : order) {
-        if (entry == 0xFF) continue;
-        const auto item = static_cast<std::int32_t>(entry & 0x7F);
+        const auto item = order_item(entry);
         if (!is_owned(owned, item) || listed[static_cast<std::size_t>(item)]) continue;
         for (std::size_t p = 1; p < banks.page_count(); ++p) {
             const auto& slots = banks.slots(page_at(p));
