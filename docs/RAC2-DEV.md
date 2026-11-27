@@ -127,3 +127,15 @@ native close marker changes. Permit state 4 arg 0 only as continuation of
 an observed Quick Select session, same load generation, with a 120-frame
 safety limit. Restore canonical slots on commit or abort; log the expected
 item and native selected slot. No changes to RAC1 or the inventory algorithm.
+
+## Dev.8: allow gameplay to resume during the native closing fade
+
+Live dev.7 logs show every extra-page release aborts after three frames:
+state=0 arg=0, native close stamp unchanged. Continue the already observed
+same-load closing session through state 0 / arg 0 (playing or transitional
+menu phase), until the native close marker changes or the existing bounded
+120-frame timeout expires. Other menu modes, cutscenes and level loads still
+abort. Add a compile-time regression test for this transition and log the
+native pending/equipped item on close. No additional hooks or changes to
+RAC1. The SDK 1.34.0 does not expose a RAC2 save-serialize hook; this remains
+an experimental short-lived projection, not a scoped native wheel hook.

@@ -1,5 +1,6 @@
 #include "expanded_quick_select/banks.hpp"
 #include "expanded_quick_select/rac2_input.hpp"
+#include "expanded_quick_select/rac2_close.hpp"
 #include "expanded_quick_select/rac2_inventory.hpp"
 #include <iterator>
 #include "expanded_quick_select/sessions.hpp"
@@ -14,6 +15,15 @@
 
 int main() {
     namespace eqs = expanded_quick_select;
+    namespace close = eqs::rac2_close;
+    static_assert(close::context(true, false, 4, 7));
+    static_assert(close::context(true, false, 4, 0));
+    // Observed dev.7 failure: gameplay resumes after 3 frames, before commit.
+    static_assert(close::context(false, true, 0, 0));
+    static_assert(close::context(true, false, 0, 0));
+    static_assert(!close::context(true, false, 4, 3));
+    static_assert(!close::context(false, false, 0, 0));
+    static_assert(!close::context(false, true, 2, 0));
     namespace ri = expanded_quick_select::rac2_input;
     std::uint8_t report[] = {0xFF, 0xE3, 0x80, 0x80}; // Triangle, L1 and R1 held
     assert((ri::held(report, 4) & (ri::kTriangle | ri::kShoulders)) ==

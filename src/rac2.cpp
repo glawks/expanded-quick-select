@@ -2,6 +2,7 @@
 #include "expanded_quick_select/banks.hpp"
 #include "expanded_quick_select/gameplay_hint.hpp"
 #include "expanded_quick_select/rac2_input.hpp"
+#include "expanded_quick_select/rac2_close.hpp"
 #include "expanded_quick_select/rac2_inventory.hpp"
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
@@ -30,6 +31,10 @@ constexpr openrac::gaddr kRadialSlotCount = 0x001B18D0;
 // after the selected weapon has been committed.
 constexpr openrac::gaddr kWheelCloseFrame = 0x001B18F8;
 constexpr openrac::gaddr kWheelClosedSelection = 0x001B1900;
+// g_hero_state + 0x22C8 (g_slot_index_first): native pending item.
+// Read only, for diagnostics of the actual commit.
+constexpr openrac::gaddr kPendingItem = 0x0018C0E8;
+constexpr openrac::gaddr kEquippedItem = 0x0018B068;
 constexpr unsigned kMaxClosingFrames = 120;
 constexpr openrac::gaddr kGuestRamSize = 0x02000000;
 constexpr openrac::gaddr kItemMap = 0x00139568;
@@ -186,19 +191,25 @@ private:
         const auto mem = mod.memory();
         const auto state = mem.read<std::int32_t>(mod.relocate(kGameState));
         const auto arg = mem.read<std::int32_t>(mod.relocate(kStateArg));
-        const bool wheel_or_fade = status.phase == OPENRAC_PLAY_MENU &&
-            state == kDialogState && (arg == kQuickSelectArg || arg == 0);
+        const bool wheel_or_fade = rac2_close::context(
+            status.phase == OPENRAC_PLAY_MENU,
+            status.phase == OPENRAC_PLAY_PLAYING, state, arg);
         const auto stamp = close_stamp();
         if (!closing) {
             if (triangle && arg == kQuickSelectArg) return false;
             if (!wheel_or_fade || stamp != native_close_stamp) return false;
             closing = true;
             closing_frames = 0;
+            logged_resume = false;
             mod.info("RAC2: retaining page " +
                      std::to_string(page_index(banks.active_page()) + 1) +
                      " until native wheel commit; close stamp " + std::to_string(stamp));
         }
         const bool committed = stamp != native_close_stamp;
+        if (state == 0 && arg == 0 && !logged_resume) {
+            logged_resume = true;
+            mod.info("RAC2: gameplay resumed before native wheel close; retaining extra page");
+        }
         if (frame) ++closing_frames;
         if (committed || !wheel_or_fade || closing_frames >= kMaxClosingFrames) {
             if (committed) {
@@ -208,7 +219,12 @@ private:
                     ? page[static_cast<std::size_t>(selected)] : 0;
                 mod.info("RAC2: native wheel committed slot " + std::to_string(selected) +
                          " on page " + std::to_string(page_index(banks.active_page()) + 1) +
-                         "; expected item " + std::to_string(expected));
+                         "; expected item " + std::to_string(expected) +
+                         "; pending item " +
+                         std::to_string(mem.read<std::int32_t>(mod.relocate(kPendingItem))) +
+                         "; equipped item " +
+                         std::to_string(mem.read<std::int32_t>(mod.relocate(kEquippedItem))) +
+                         "; closing frames " + std::to_string(closing_frames));
             } else {
                 mod.warn("RAC2: closing projection ended without observed commit; state=" +
                          std::to_string(state) + " arg=" + std::to_string(arg) +
@@ -501,7 +517,7 @@ private:
     bool logged_projection = false;
     bool logged_inventory = false, warned_inventory = false;
     bool projection_active = false;
-    bool native_seen = false, closing = false;
+    bool native_seen = false, closing = false, logged_resume = false;
     std::uint32_t native_loads = 0, native_close_stamp = 0;
     unsigned closing_frames = 0;
     bool warned_store = false;
