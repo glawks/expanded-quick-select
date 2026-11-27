@@ -1,4 +1,4 @@
-# RAC2 support (experimental: rac2dev)
+# RAC2 support (experimental: 2.0)
 
 This branch keeps the tested RAC1 implementation intact and adds a separate
 NTSC-U (v1.01) RAC2 runtime. It is **not a finished RAC2 release**.
@@ -11,8 +11,10 @@ NTSC-U (v1.01) RAC2 runtime. It is **not a finished RAC2 release**.
 - Opt-in Triangle + L1/R1 page switching using the SDK's active-low pad callback.
 - A guarded, single-game-tick projection of RAC2's eight native Quick Select slots
   and its eight-entry HUD icon cache, with restoration after each game tick.
-- New items in the game's inventory weapon/gadget order are put into the first
-  empty extra-wheel slot if they are not already on a page.
+- Owned items in the game's inventory weapon/gadget order are put into the first
+  empty extra-wheel slot if not already on an active page, including existing saves.
+  Existing sidecar slots are preserved. Input is limited to the playing phase;
+  unavailable sidecar items are masked from projection.
 - A HUD text hint shows the current page; page-1 canonical save data is intended
   to remain untouched.
 
@@ -25,7 +27,7 @@ NTSC-U (v1.01) RAC2 runtime. It is **not a finished RAC2 release**.
   SDK 1.20.0; this first attempt uses `on_pad`, `on_frame`, and `Item_Give`.
   The pad-to-frame timing and exact HUD cache lifetime require in-game testing.
 - **The pause-menu Quick Select editor is not ported.** Extra pages presently
-  populate automatically on acquiring eligible weapons/gadgets, not through
+  populate automatically from owned eligible weapons/gadgets, not through
   a fully featured editor. Existing saved extras load from the sidecars.
 - On a HUD cache mismatch, the implementation skips writing game memory and
   warns once. This may prevent page switching until the correct cache
@@ -43,9 +45,13 @@ and `OpenRAC/rac2-decomp/nonmatching/game/func_0028BCE8.c`:
 | HUD cache | `D_00255170` (8 × 0x1C; icon at +0, item at +0x18) |
 | Item-to-record index | `g_itemEquippedSlot = 0x00139568` (u8 per item) |
 | Item records | `g_weaponTable = 0x00239BA0` (0xE0 per record, u16 icon at +0x3C) |
+| Owned flags | `g_inventoryOwned = 0x001A7AF8` (56 bytes) |
 | Inventory order | `g_inventoryOrder = 0x001A7B68` (32 bytes, flagged items) |
 
 All addresses and their relocation must be verified live before wider support.
+Dev.2 restores projected slots before native item grants and skips cache restoration
+across level-load generations; it is still a pad-to-frame projection, not a scoped
+native wheel hook. Back up saves before testing.
 
 ## Suggested in-game test order
 
@@ -55,7 +61,8 @@ All addresses and their relocation must be verified live before wider support.
 3. With items already equipped, hold Triangle and press R1. Verify the
    page hint and whether the wheel icons switch. Hold R1 to test edge detection;
    press L1 to go back. Try releasing Triangle while page 2 is active.
-4. Gain a *new* weapon with a full first wheel. Confirm it appears on page 2
+4. First verify existing owned items absent from page 1 appear on extra pages.
+   Gain a *new* weapon with a full first wheel. Confirm it appears on page 2
    and persists after reload. Test already-owned pickups as well.
 5. Test save/load, respawning, entering menus and swapping planets, and capture
    the log, especially any 'RAC2 HUD cache mismatch' warning.

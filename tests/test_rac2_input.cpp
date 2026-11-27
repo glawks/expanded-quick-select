@@ -1,5 +1,7 @@
 #include "expanded_quick_select/banks.hpp"
 #include "expanded_quick_select/rac2_input.hpp"
+#include "expanded_quick_select/rac2_inventory.hpp"
+#include <iterator>
 #include "expanded_quick_select/sessions.hpp"
 #include "expanded_quick_select/slot_store.hpp"
 #ifdef NDEBUG
@@ -33,6 +35,32 @@ int main() {
     assert(eqs::valid_game_slots(valid, 55));
     valid[0] = 56;
     assert(!eqs::valid_game_slots(valid, 55));
+
+    namespace inv = eqs::rac2_inventory;
+    eqs::Banks existing({{1, 2, 3, 4, 5, 6, 7, 8}}, 55);
+    existing.set_page_count(3);
+    existing.set_slot(eqs::Page::Secondary, 1, 12);
+    inv::Owned owned{};
+    owned.fill(1);
+    owned[20] = 0;
+    inv::Order order{};
+    order.fill(0xFF);
+    const std::uint8_t entries[] = {1, 0x89, 9, 12, 10, 20, 127, 0, 11, 13, 14, 15, 16, 17, 55};
+    std::copy(std::begin(entries), std::end(entries), order.begin());
+    auto changes = inv::fill_owned_pages(existing, order, owned);
+    assert(!changes[0] && changes[1] && changes[2]);
+    const eqs::Slots expected_primary{{1, 2, 3, 4, 5, 6, 7, 8}};
+    const eqs::Slots expected_secondary{{9, 12, 10, 11, 13, 14, 15, 16}};
+    assert(existing.slots(eqs::Page::Primary) == expected_primary);
+    assert(existing.slots(eqs::Page::Secondary) == expected_secondary);
+    assert(existing.slots(eqs::Page::Third)[0] == 17);
+    assert(existing.slots(eqs::Page::Third)[1] == 55);
+    assert(inv::fill_owned_pages(existing, order, owned) == inv::Changed{});
+    assert(!inv::is_owned(owned, 0) && !inv::is_owned(owned, 56) &&
+           !inv::is_owned(owned, -1) && !inv::is_owned(owned, 20));
+    existing.set_page_count(1);
+    assert(inv::fill_owned_pages(existing, order, owned) == inv::Changed{});
+    assert(existing.slots(eqs::Page::Secondary) == expected_secondary);
 
     auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
     auto dir = std::filesystem::temp_directory_path() / ("eqs-rac2-" + std::to_string(suffix));
