@@ -2,7 +2,7 @@
   "format": 2,
   "id": "expanded-quick-select",
   "name": "Expanded Quick Select",
-  "version": "2.0.0-dev.6",
+  "version": "2.0.0-dev.7",
   "author": "glawks",
   "description": "Development: RAC1 native wheel and optional Weapon Wheel Pause bridge; experimental RAC2 prototype.",
   "type": "native",

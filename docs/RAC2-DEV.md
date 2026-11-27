@@ -114,3 +114,16 @@ require the separate owned flag. Filter missing icons and the 0xEA7E icon
 rejected by the native ring editor. Test actual flagged list values and log
 eligible IDs and first raw list if unavailable. No changes to RAC1, projection
 or persistence.
+
+## Dev.7: retain the extra page until the native release commit
+
+Dev.6 populated page two, but restoring on menu argument 0 or the next frame
+allowed the native release/fade to select the primary page's item instead.
+The native weapon_wheel_update_select (0028BE00) writes its pending item
+when the fade reaches zero, then records the selected slot and frame in
+0x001B1900 and 0x001B18F8. Snapshot that frame on entry to Quick Select and
+keep the last extra-page projection across pad/frame callbacks until the
+native close marker changes. Permit state 4 arg 0 only as continuation of
+an observed Quick Select session, same load generation, with a 120-frame
+safety limit. Restore canonical slots on commit or abort; log the expected
+item and native selected slot. No changes to RAC1 or the inventory algorithm.

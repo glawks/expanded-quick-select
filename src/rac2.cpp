@@ -26,6 +26,11 @@ constexpr openrac::gaddr kHudCache = 0x00255170;
 constexpr openrac::gaddr kRadialPages = 0x001B18D4;
 constexpr openrac::gaddr kRadialPageIndex = 0x001A8D48;
 constexpr openrac::gaddr kRadialSlotCount = 0x001B18D0;
+// Despite its name, weapon_wheel_update_select writes this on native close,
+// after the selected weapon has been committed.
+constexpr openrac::gaddr kWheelCloseFrame = 0x001B18F8;
+constexpr openrac::gaddr kWheelClosedSelection = 0x001B1900;
+constexpr unsigned kMaxClosingFrames = 120;
 constexpr openrac::gaddr kGuestRamSize = 0x02000000;
 constexpr openrac::gaddr kItemMap = 0x00139568;
 constexpr openrac::gaddr kItemRecords = 0x00239BA0;
@@ -60,7 +65,6 @@ public:
 
     void on_pad(int port, std::uint8_t* report, int size) {
         if (port != 0 || !report || size < 2) return;
-        restore();
         const auto held = rac2_input::held(report, size);
         const bool triangle = (held & rac2_input::kTriangle) != 0;
         const bool l1 = (held & rac2_input::kL1) != 0;
@@ -68,6 +72,11 @@ public:
         last_l1 = l1;
         last_r1 = r1;
         const auto status = mod.play_status();
+        if (handle_close(status, triangle, false)) {
+            if (closing) rac2_input::consume_page_buttons(report, size);
+            return;
+        }
+        restore();
         if (!wheel_phase(status)) {
             cancel_wheel(l1, r1);
             return;
@@ -112,8 +121,9 @@ public:
     }
 
     void on_frame() {
-        restore();
         const auto status = mod.play_status();
+        if (handle_close(status, last_triangle, true)) return;
+        restore();
         if (!wheel_phase(status)) {
             cancel_wheel(last_l1, last_r1);
             return;
@@ -126,6 +136,7 @@ public:
         // Keep the selected page until the native mode exits, not just until
         // the first pad report with Triangle released.
         if (!last_triangle && !native_wheel_menu(status)) {
+            native_seen = false;
             wheel.after_update(banks, false);
             wheel.before_update(banks, false, last_l1, last_r1);
             if (status.phase == OPENRAC_PLAY_PLAYING) sync_inventory();
@@ -154,6 +165,79 @@ public:
     void before_item_give() { restore(); }
 
 private:
+    std::uint32_t close_stamp() const {
+        return mod.memory().read<std::uint32_t>(mod.relocate(kWheelCloseFrame));
+    }
+
+    // Keep the last visible extra page published during the native closing
+    // animation. The menu's pending argument can become 0 *before* the
+    // selector's fade reaches zero and it reads the chosen item.
+    // Do not let a generic phase/argument transition cancel it early.
+    bool handle_close(const openrac_play_status& status, bool triangle, bool frame) {
+        if (!closing && (!native_seen || !banks.wheel_open() ||
+                         banks.active_page() == Page::Primary)) return false;
+        const bool same_level = mod.loaded_level() >= 0 && status.loads == native_loads;
+        if (!same_level) {
+            if (!closing) return false;
+            restore();
+            cancel_wheel(last_l1, last_r1);
+            return true;
+        }
+        const auto mem = mod.memory();
+        const auto state = mem.read<std::int32_t>(mod.relocate(kGameState));
+        const auto arg = mem.read<std::int32_t>(mod.relocate(kStateArg));
+        const bool wheel_or_fade = status.phase == OPENRAC_PLAY_MENU &&
+            state == kDialogState && (arg == kQuickSelectArg || arg == 0);
+        const auto stamp = close_stamp();
+        if (!closing) {
+            if (triangle && arg == kQuickSelectArg) return false;
+            if (!wheel_or_fade || stamp != native_close_stamp) return false;
+            closing = true;
+            closing_frames = 0;
+            mod.info("RAC2: retaining page " +
+                     std::to_string(page_index(banks.active_page()) + 1) +
+                     " until native wheel commit; close stamp " + std::to_string(stamp));
+        }
+        const bool committed = stamp != native_close_stamp;
+        if (frame) ++closing_frames;
+        if (committed || !wheel_or_fade || closing_frames >= kMaxClosingFrames) {
+            if (committed) {
+                const auto selected = mem.read<std::int32_t>(mod.relocate(kWheelClosedSelection));
+                const auto& page = banks.slots(banks.active_page());
+                const auto expected = selected >= 0 && selected < static_cast<int>(page.size())
+                    ? page[static_cast<std::size_t>(selected)] : 0;
+                mod.info("RAC2: native wheel committed slot " + std::to_string(selected) +
+                         " on page " + std::to_string(page_index(banks.active_page()) + 1) +
+                         "; expected item " + std::to_string(expected));
+            } else {
+                mod.warn("RAC2: closing projection ended without observed commit; state=" +
+                         std::to_string(state) + " arg=" + std::to_string(arg) +
+                         " frames=" + std::to_string(closing_frames));
+            }
+            restore();
+            cancel_wheel(last_l1, last_r1);
+            return true;
+        }
+        // Unlike the held-wheel path, keep the projection live across
+        // frame callbacks: the game's selection may happen on a later tick
+        // even if no further pad report is received.
+        if (!projection_active) {
+            const auto primary = mem.read<Slots>(mod.relocate(kNativeSlots));
+            auto page = banks.slots(banks.active_page());
+            const auto owned = mem.read<rac2_inventory::Owned>(mod.relocate(kInventoryOwned));
+            for (auto& item : page)
+                if (!rac2_inventory::is_owned(owned, item)) item = 0;
+            if (!valid_game_slots(primary, kRac2MaxItemId) ||
+                !project(primary, page, status.loads)) {
+                mod.warn("RAC2: unable to retain closing projection");
+                cancel_wheel(last_l1, last_r1);
+                return true;
+            }
+        }
+        last_triangle = triangle;
+        return true;
+    }
+
     bool native_wheel_menu(const openrac_play_status& status) const {
         if (mod.loaded_level() < 0 || status.phase != OPENRAC_PLAY_MENU) return false;
         const auto mem = mod.memory();
@@ -172,6 +256,11 @@ private:
             const auto state = mem.read<std::int32_t>(mod.relocate(kGameState));
             const auto arg = mem.read<std::int32_t>(mod.relocate(kStateArg));
             const bool quick = state == kDialogState && arg == kQuickSelectArg;
+            if (quick && !native_seen) {
+                native_seen = true;
+                native_loads = status.loads;
+                native_close_stamp = close_stamp();
+            }
             if ((banks.wheel_open() || quick) &&
                 (state != last_game_state || arg != last_state_arg)) {
                 last_game_state = state;
@@ -186,6 +275,8 @@ private:
     }
 
     void cancel_wheel(bool l1, bool r1) {
+        closing = native_seen = false;
+        closing_frames = 0;
         banks.close_wheel();
         wheel.before_update(banks, false, l1, r1);
         last_triangle = false;
@@ -257,6 +348,8 @@ private:
         warned_cache = false;
         logged_projection = false;
         logged_inventory = warned_inventory = false;
+        closing = native_seen = false;
+        closing_frames = 0;
         wheel = WheelSession{};
         for (std::size_t p = 1; p < kMaxPages; ++p) {
             banks.set_page(page_at(p), store.load(slot, page_at(p)).value_or(Slots{}));
@@ -408,6 +501,9 @@ private:
     bool logged_projection = false;
     bool logged_inventory = false, warned_inventory = false;
     bool projection_active = false;
+    bool native_seen = false, closing = false;
+    std::uint32_t native_loads = 0, native_close_stamp = 0;
+    unsigned closing_frames = 0;
     bool warned_store = false;
     std::array<bool, kMaxPages> dirty_pages{};
     openrac::gaddr projected_slots = 0;
