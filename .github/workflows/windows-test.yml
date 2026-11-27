@@ -1,14 +1,9 @@
-# Build and package six supported platforms: five desktop targets and Android ARM64.
-# Pushes to development/main build test artifacts. A matching vX.Y.Z tag
-# publishes the verified ZIPs; an explicitly named main release commit may
-# create the matching tag and publish in its verified run.
-# Based on OpenRAC's pinned Mod SDK build/release workflow.
-name: Cross-platform build and release
+# EQS 2.0 development: Windows x64 test packages only. No release publishing.
+name: EQS 2.0 Windows test
 
 on:
   push:
-    branches: [development, main, android-dev, rac2dev]
-    tags: ["v*"]
+    branches: ["2.0"]
   workflow_dispatch:
 
 permissions:
@@ -16,38 +11,14 @@ permissions:
 
 concurrency:
   group: expanded-quick-select-ci-${{ github.ref }}
-  # Release builds should not be cancelled by a second tag event.
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: ${{ matrix.platform }}
-    runs-on: ${{ matrix.os }}
+    if: github.ref == 'refs/heads/2.0'
+    name: Windows x64
+    runs-on: windows-2025
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-x86_64
-            os: windows-2025
-          - platform: linux-x86_64
-            os: ubuntu-22.04
-          - platform: linux-aarch64
-            os: ubuntu-24.04-arm
-          - platform: macos-arm64
-            os: macos-15
-            configure: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
-          - platform: macos-x86_64
-            os: macos-15
-            configure: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
-            skip_tests: true
-          # Android ARM64 via NDK API 28; tested in-game separately.
-          - platform: android-arm64
-            os: ubuntu-24.04
-            configure: >-
-              -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake
-              -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28
-            skip_tests: true
     defaults:
       run:
         shell: bash
@@ -61,7 +32,6 @@ jobs:
       - name: Install Ninja
         run: python -m pip install ninja
       - name: Set up MSVC
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
@@ -71,15 +41,14 @@ jobs:
       - name: Fetch and verify official OpenRAC Mod SDK
         run: echo "SDK=$(python tools/fetch_sdk.py)" >> "$GITHUB_ENV"
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${{ matrix.configure }}
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Compile
         run: cmake --build build --parallel
       - name: Run tests
-        if: ${{ !matrix.skip_tests }}
         run: ctest --test-dir build --output-on-failure --no-tests=error
       - name: Package platform mod
         env:
-          PLATFORM: ${{ matrix.platform }}
+          PLATFORM: windows-x86_64
         run: |
           python "$SDK/tools/package_mod.py" build/package/* -o dist
           ls -lh dist
@@ -95,184 +64,3 @@ jobs:
           name: expanded-quick-select-${{ matrix.platform }}-test
           path: dist/*.zip
           if-no-files-found: error
-
-  merge:
-    name: Assemble combined six-platform mod ZIP
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-      - name: Fetch and verify official OpenRAC Mod SDK
-        run: echo "SDK=$(python tools/fetch_sdk.py)" >> "$GITHUB_ENV"
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: expanded-quick-select-*-test
-          path: dist
-          merge-multiple: true
-      - name: Merge all six native builds
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          manifest = json.loads(Path("openrac-mod.json").read_text())
-          version = manifest["version"]
-          platforms = ["windows-x86_64", "linux-x86_64", "linux-aarch64",
-                       "macos-arm64", "macos-x86_64", "android-arm64"]
-          expected = [Path("dist") / f"expanded-quick-select-{version}-{p}.zip" for p in platforms]
-          for path in expected:
-              if not path.is_file():
-                  raise SystemExit(f"Missing platform package: {path}")
-          print("Found all six platform archives")
-          PY
-          version=$(python -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
-          python "$SDK/tools/package_mod.py" --merge dist/expanded-quick-select-"$version"-*.zip -o dist/expanded-quick-select-"$version".zip
-          python - <<'PY'
-          import json, zipfile
-          from pathlib import Path
-          version = json.loads(Path("openrac-mod.json").read_text())["version"]
-          archive = Path("dist") / f"expanded-quick-select-{version}.zip"
-          expected = {"windows-x86_64", "linux-x86_64", "linux-aarch64",
-                      "macos-arm64", "macos-x86_64", "android-arm64"}
-          with zipfile.ZipFile(archive) as z:
-              manifest = json.loads(z.read("openrac-mod.json"))
-              assert set(manifest["plugin"]) == expected, manifest.get("plugin")
-              for platform, lib in manifest["plugin"].items():
-                  assert lib in z.namelist(), f"Missing {platform}: {lib}"
-              print("Verified bundled libraries:", ", ".join(sorted(expected)))
-          PY
-          (cd dist && sha256sum *.zip > SHA256SUMS)
-          cat dist/SHA256SUMS
-      - name: Validate archive, versions, MIT licence and checksums
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          version=$(python -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
-          if [ "$IS_TAG" = "true" ]; then
-            python tools/verify_release.py --tag "$RELEASE_TAG" --dist dist
-          else
-            # Run the same validation code on development/main without
-            # publishing or needing a real Git tag.
-            python tools/verify_release.py --tag "v$version" --dist dist
-          fi
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: expanded-quick-select-all-platforms-test
-          path: |
-            dist/*.zip
-            dist/SHA256SUMS
-          if-no-files-found: error
-
-  # A tag publishes the release. An explicit main commit with subject
-  # "release: publish vX.Y.Z" may create that tag and publish in the same
-  # run, since tags pushed with GITHUB_TOKEN don't trigger another workflow.
-  # All other main/development pushes remain build-only.
-  release:
-    name: Publish verified GitHub Release
-    needs: merge
-    if: "${{ needs.merge.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: publish v'))) }}"
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: expanded-quick-select-all-platforms-test
-          path: dist
-      - name: Check explicit release intent and resolve version tag
-        run: |
-          set -euo pipefail
-          version=$(python3 -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
-          tag="v$version"
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            tag="${GITHUB_REF#refs/tags/}"
-          elif [[ "$GITHUB_REF" == refs/heads/main ]]; then
-            subject=$(git log -1 --pretty=%s)
-            if [[ "$subject" != "release: publish $tag" ]]; then
-              echo "::error::The release commit subject must be exactly 'release: publish $tag'"
-              exit 1
-            fi
-          else
-            echo "::error::Unexpected release ref $GITHUB_REF"
-            exit 1
-          fi
-          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
-      - name: Verify tag, combined mod and hashes before publishing
-        run: python3 tools/verify_release.py --tag "$RELEASE_TAG" --dist dist
-      - name: Create matching tag for explicit main release commit
-        if: ${{ github.ref == 'refs/heads/main' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          # If an earlier attempt created the lightweight tag, permit a
-          # retry only when it points to this exact verified commit.
-          existing=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)
-          # The CLI may return a JSON 404 body on stdout rather than
-          # an empty string. Only a 40-character Git SHA is a valid ref.
-          if [[ "$existing" =~ ^[0-9a-f]{40}$ ]]; then
-            if [[ "$existing" != "$GITHUB_SHA" ]]; then
-              echo "::error::$RELEASE_TAG already points to $existing, not $GITHUB_SHA"
-              exit 1
-            fi
-            echo "Existing $RELEASE_TAG already points to this verified commit"
-          else
-            gh api --method POST "repos/$GH_REPO/git/refs" \
-              -f "ref=refs/tags/$RELEASE_TAG" \
-              -f "sha=$GITHUB_SHA" \
-              --silent
-            echo "Created $RELEASE_TAG at $GITHUB_SHA"
-          fi
-      - name: Create release and upload checked ZIPs
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          version = json.loads(Path("openrac-mod.json").read_text())["version"]
-          sdk = json.loads(Path("sdk.lock").read_text())["version"]
-          tag = os.environ["RELEASE_TAG"]
-          sha = os.environ["GITHUB_SHA"]
-          notes = f"""## Expanded Quick Select {tag}
-
-          Add 1–8 configurable eight-slot Quick Select wheels to Ratchet & Clank 1 in OpenRAC.
-
-          **Install:** Add the combined `expanded-quick-select-{version}.zip` to the OpenRAC launcher's Mods tab, or install from this repository URL.
-
-          **Controls:** Hold Triangle and press L1/R1 to switch wheels. In the pause-menu Quick Select editor, use L2/R2. Choose 1–8 wheels in the mod's launcher settings (default: 2).
-
-          **New in v1.0.3:** Optional read-only cross-mod compatibility API v1 to expose active Quick Select pages and native slots. HUD validation also recognises the known native Walloper/Revolverator carrier icon pair while preserving checks for other weapons. No save format, controls or page assignments were changed. Separate logical Revolverator bindings on secondary wheels and post-respawn custom icons remain unsupported.
-
-          **Compatibility:** Windows NTSC-U and Android ARM64 have been confirmed working in-game. PAL and Linux/macOS still need in-game testing. All six native builds passed automated checks.
-
-          **Requirement:** OpenRAC native mod API 1.13 or later, for touch-control support.
-
-          This release was built from commit `{sha}` with OpenRAC Mod SDK `{sdk}`. The archives and `SHA256SUMS` are produced automatically by the official SDK packaging tools.
-          """
-          Path("release-notes.md").write_text(notes, encoding="utf-8")
-          PY
-          version=$(python3 -c 'import json; print(json.load(open("openrac-mod.json"))["version"])')
-          # A rerun may upload rebuilt assets for the same tag, but never
-          # creates a second release or publishes a different version.
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" --clobber dist/*.zip dist/SHA256SUMS
-          else
-            args=()
-            if [[ "$RELEASE_TAG" == *-* ]]; then args+=(--prerelease); fi
-            gh release create "$RELEASE_TAG" --verify-tag --title "Expanded Quick Select $version" --notes-file release-notes.md "${args[@]}" dist/*.zip dist/SHA256SUMS
-          fi
