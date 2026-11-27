@@ -91,3 +91,15 @@ mod.relocate() (the SDK equivalent of OPENRAC_DATA). Log the actual state
 and argument, and recover a held-Triangle session in that confirmed menu.
 The overlay API is unchanged. If save_slot_current() returns -1, extra
 pages are available in memory but not written to a guessed save slot.
+
+## Dev.5: resolve the live native radial cache
+
+Dev.4 confirmed state=4 arg=7 but the page projection rejected a zeroed cache.
+The NTSC-U addresses are executable addresses: relocate_level(loaded_level(),
+address) is a no-op, not executable-to-level relocation. Use relocate() for
+item records and radial globals, then follow g_radial_menu_pages (0x001B18D4)
+to the actual page-zero cache as native wheel update/draw do. Verify eight
+slots, page index zero, RAM bounds, canonical item IDs and icon values before
+projection. Extra-page icon values must also be valid. Log requested page,
+resolved cache/records on mismatch, successful validation, and inventory fill.
+Still experimental; no pause-editor or save-slot fallback changes.

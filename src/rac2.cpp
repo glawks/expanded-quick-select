@@ -23,6 +23,10 @@ namespace {
 // OpenRAC's port/game/rac2-ntsc/host/rac2_addresses.h.
 constexpr openrac::gaddr kNativeSlots = 0x001A73B8;
 constexpr openrac::gaddr kHudCache = 0x00255170;
+constexpr openrac::gaddr kRadialPages = 0x001B18D4;
+constexpr openrac::gaddr kRadialPageIndex = 0x001A8D48;
+constexpr openrac::gaddr kRadialSlotCount = 0x001B18D0;
+constexpr openrac::gaddr kGuestRamSize = 0x02000000;
 constexpr openrac::gaddr kItemMap = 0x00139568;
 constexpr openrac::gaddr kItemRecords = 0x00239BA0;
 constexpr openrac::gaddr kInventoryOrder = 0x001A7B68;
@@ -83,7 +87,11 @@ public:
         const bool was_open = banks.wheel_open();
         last_triangle = triangle;
         // Don't change page on the release tick: commit the last shown page.
+        const auto previous_page = banks.active_page();
         if (triangle || !was_open) wheel.before_update(banks, triangle, l1, r1);
+        if (previous_page != banks.active_page())
+            mod.info("RAC2: requested page " +
+                     std::to_string(page_index(banks.active_page()) + 1));
         if ((triangle || was_open) && banks.wheel_open() &&
             banks.active_page() != Page::Primary) {
             auto page = banks.slots(banks.active_page());
@@ -195,7 +203,13 @@ private:
         const auto owned = mem.read<rac2_inventory::Owned>(mod.relocate(kInventoryOwned));
         const auto changed = rac2_inventory::fill_owned_pages(banks, order, owned);
         for (std::size_t p = 1; p < banks.page_count(); ++p) {
-            if (changed[p]) dirty_pages[p] = true;
+            if (changed[p]) {
+                dirty_pages[p] = true;
+                const auto& slots = banks.slots(page_at(p));
+                mod.info("RAC2: populated wheel " + std::to_string(p + 1) + " with " +
+                         std::to_string(std::count_if(slots.begin(), slots.end(),
+                             [](auto item) { return item != 0; })) + " items");
+            }
             if (!dirty_pages[p] || last_save_slot < 0) continue;
             if (store.save(last_save_slot, page_at(p), banks.slots(page_at(p)))) {
                 dirty_pages[p] = false;
@@ -214,6 +228,7 @@ private:
         dirty_pages.fill(false);
         warned_store = false;
         warned_cache = false;
+        logged_projection = false;
         wheel = WheelSession{};
         for (std::size_t p = 1; p < kMaxPages; ++p) {
             banks.set_page(page_at(p), store.load(slot, page_at(p)).value_or(Slots{}));
@@ -224,37 +239,72 @@ private:
         else mod.info("RAC2: loaded extra wheels for save slot " + std::to_string(slot));
     }
 
-    openrac::gaddr level_data(openrac::gaddr address) const {
-        return mod.relocate_level(mod.loaded_level(), address);
+    static bool guest_range(openrac::gaddr addr, std::size_t size) {
+        return addr >= 0x10000 && addr < kGuestRamSize &&
+               size <= kGuestRamSize - addr;
     }
 
-    // Builds the original game's icon value from the same table and record
-    // offsets used by decompiled func_0028BCE8.
+    // These constants come from the executable, NOT the loaded planet.
+    // relocate_level(current, address) returns the input unchanged.
+    // Resolve the actual ring through the same pointer chain as its
+    // native update/draw code: pages[page_index].
+    openrac::gaddr live_cache() const {
+        const auto mem = mod.memory();
+        const auto count_addr = mod.relocate(kRadialSlotCount);
+        const auto index_addr = mod.relocate(kRadialPageIndex);
+        const auto pages_addr = mod.relocate(kRadialPages);
+        if (!guest_range(count_addr, 4) || !guest_range(index_addr, 4) ||
+            !guest_range(pages_addr, 4)) return 0;
+        if (mem.read<std::int32_t>(count_addr) != 8 ||
+            mem.read<std::int32_t>(index_addr) != 0) return 0;
+        const auto pages = mem.read<openrac::gaddr>(pages_addr);
+        if (!guest_range(pages, 4) || pages % 4 != 0) return 0;
+        const auto cache = mem.read<openrac::gaddr>(pages);
+        return guest_range(cache, sizeof(Cache)) && cache % 4 == 0 ? cache : 0;
+    }
+
+    // Original weapon_menu_init_slots uses executable g_weapon_table,
+    // indexed by g_item_slot_to_record. Use executable-to-active relocation.
     std::uint32_t icon_for(std::int32_t item) const {
         const auto mem = mod.memory();
-        const auto mapping = mem.read<std::uint8_t>(
-            mod.relocate(kItemMap) + static_cast<openrac::gaddr>(item));
-        return mem.read<std::uint16_t>(
-            level_data(kItemRecords) + mapping * kRecordStride + 0x3C);
+        const auto map = mod.relocate(kItemMap);
+        const auto records = mod.relocate(kItemRecords);
+        if (item < 0 || item > kRac2MaxItemId ||
+            !guest_range(map, kRac2MaxItemId + 1)) return 0;
+        const auto mapping = mem.read<std::uint8_t>(map + static_cast<openrac::gaddr>(item));
+        if (!guest_range(records, (static_cast<std::size_t>(mapping) + 1) * kRecordStride))
+            return 0;
+        return mem.read<std::uint16_t>(records + mapping * kRecordStride + 0x3C);
     }
 
     bool project(const Slots& primary, const Slots& secondary, std::uint32_t loads) {
         if (!valid_game_slots(secondary, kRac2MaxItemId)) return false;
         const auto mem = mod.memory();
-        const auto cache_addr = level_data(kHudCache);
+        const auto cache_addr = live_cache();
+        if (!cache_addr) {
+            if (!warned_cache) {
+                warned_cache = true;
+                mod.warn("RAC2: native radial page unavailable; refusing projection");
+            }
+            return false;
+        }
         const auto cache = mem.read<Cache>(cache_addr);
-        // If the cache does not match the canonical page, do not poke
-        // unknown/relocated menu data. Requires a live game verification.
+        // Require a native ring that matches the canonical page and item
+        // records before writing anything. Never write to an unverified pointer.
         bool good = false;
         for (std::size_t i = 0; i < primary.size(); ++i) {
+            const auto expected = icon_for(primary[i]);
             if (cache[i].item != primary[i] ||
-                cache[i].icon != icon_for(primary[i])) {
+                cache[i].icon != expected || (primary[i] != 0 && expected == 0)) {
                 if (!warned_cache) {
                     mod.warn("RAC2 HUD cache mismatch at slot " + std::to_string(i) +
                              ": native item " + std::to_string(primary[i]) +
                              ", cache item " + std::to_string(cache[i].item) +
                              ", cache icon " + std::to_string(cache[i].icon) +
-                             ", expected icon " + std::to_string(icon_for(primary[i])) +
+                             ", expected icon " + std::to_string(expected) +
+                             ", live cache " + std::to_string(cache_addr) +
+                             ", relocated cache " + std::to_string(mod.relocate(kHudCache)) +
+                             ", records " + std::to_string(mod.relocate(kItemRecords)) +
                              "; skipping extra page");
                     warned_cache = true;
                 }
@@ -267,6 +317,13 @@ private:
         for (std::size_t i = 0; i < secondary.size(); ++i) {
             replacement[i].item = secondary[i];
             replacement[i].icon = icon_for(secondary[i]);
+            if (secondary[i] != 0 && replacement[i].icon == 0) {
+                if (!warned_cache) {
+                    warned_cache = true;
+                    mod.warn("RAC2: missing icon for extra item " + std::to_string(secondary[i]));
+                }
+                return false;
+            }
         }
         previous_slots = primary;
         previous_cache = cache;
@@ -278,9 +335,11 @@ private:
         mem.write(projected_slots, secondary);
         mem.write(cache_addr, replacement);
         projection_active = true;
-        if (warned_cache) {
-            mod.info("RAC2: native HUD cache matched; extra pages available");
+        if (warned_cache || !logged_projection) {
+            mod.info("RAC2: native HUD cache matched at " + std::to_string(cache_addr) +
+                     "; extra pages available");
             warned_cache = false;
+            logged_projection = true;
         }
         return true;
     }
@@ -296,8 +355,7 @@ private:
         }
         mem.write(projected_slots, slots);
         // Overlay memory can be replaced by a level load.
-        if (mod.loaded_level() < 0 || mod.play_status().loads != projected_loads ||
-            level_data(kHudCache) != projected_cache) return;
+        if (mod.loaded_level() < 0 || mod.play_status().loads != projected_loads) return;
         auto cache = mem.read<Cache>(projected_cache);
         for (std::size_t i = 0; i < cache.size(); ++i) {
             if (cache[i].item == published_cache[i].item &&
@@ -319,6 +377,7 @@ private:
     bool last_triangle = false;
     bool last_l1 = false, last_r1 = false;
     bool warned_cache = false;
+    bool logged_projection = false;
     bool projection_active = false;
     bool warned_store = false;
     std::array<bool, kMaxPages> dirty_pages{};
