@@ -27,9 +27,12 @@ constexpr openrac::gaddr kItemMap = 0x00139568;
 constexpr openrac::gaddr kItemRecords = 0x00239BA0;
 constexpr openrac::gaddr kInventoryOrder = 0x001A7B68;
 constexpr openrac::gaddr kInventoryOwned = 0x001A7AF8;
-// Native menu_is_state_seven() reads g_menu_saved_state (D_001BACC0).
-constexpr openrac::gaddr kMenuSavedState = 0x001BACC0;
-constexpr std::int32_t kWheelMenuMode = 7;
+// Same discriminator and relocation as OpenRAC's RAC2 host/touch.c:
+// state 4 is a dialog; pending arg 7 is specifically Quick Select.
+constexpr openrac::gaddr kGameState = 0x001A8BB0;
+constexpr openrac::gaddr kStateArg = 0x001AA0F8;
+constexpr std::int32_t kDialogState = 4;
+constexpr std::int32_t kQuickSelectArg = 7;
 constexpr std::int32_t kRac2MaxItemId = rac2_inventory::kMaxItemId;
 constexpr std::uint32_t kRecordStride = 0xE0;
 
@@ -73,6 +76,10 @@ public:
             return;
         }
         banks.set_primary(current);
+        if (native_wheel_menu(status) && triangle && !banks.wheel_open()) {
+            banks.open_wheel();
+            wheel = WheelSession{};
+        }
         const bool was_open = banks.wheel_open();
         last_triangle = triangle;
         // Don't change page on the release tick: commit the last shown page.
@@ -104,6 +111,9 @@ public:
             return;
         }
         refresh_slot();
+        if (native_wheel_menu(status) && last_triangle && !banks.wheel_open()) {
+            banks.open_wheel();
+        }
         // Native paused wheel commits the selection after its release/fade.
         // Keep the selected page until the native mode exits, not just until
         // the first pad report with Triangle released.
@@ -137,21 +147,32 @@ public:
 
 private:
     bool native_wheel_menu(const openrac_play_status& status) const {
-        return mod.loaded_level() >= 0 &&
-            (status.phase == OPENRAC_PLAY_MENU || status.phase == OPENRAC_PLAY_PLAYING) &&
-            mod.memory().read<std::int32_t>(level_data(kMenuSavedState)) == kWheelMenuMode;
+        if (mod.loaded_level() < 0 || status.phase != OPENRAC_PLAY_MENU) return false;
+        const auto mem = mod.memory();
+        return mem.read<std::int32_t>(mod.relocate(kGameState)) == kDialogState &&
+               mem.read<std::int32_t>(mod.relocate(kStateArg)) == kQuickSelectArg;
     }
 
     bool wheel_phase(const openrac_play_status& status) {
         if (mod.loaded_level() < 0) return false;
-        if (status.phase == OPENRAC_PLAY_PLAYING) return true;
-        if (status.phase == OPENRAC_PLAY_MENU && banks.wheel_open()) {
-            const auto mode = mod.memory().read<std::int32_t>(level_data(kMenuSavedState));
-            if (mode != last_menu_mode) {
-                last_menu_mode = mode;
-                mod.info("RAC2: wheel entered menu phase; native mode " + std::to_string(mode));
+        if (status.phase == OPENRAC_PLAY_PLAYING) {
+            last_game_state = last_state_arg = -1;
+            return true;
+        }
+        if (status.phase == OPENRAC_PLAY_MENU) {
+            const auto mem = mod.memory();
+            const auto state = mem.read<std::int32_t>(mod.relocate(kGameState));
+            const auto arg = mem.read<std::int32_t>(mod.relocate(kStateArg));
+            const bool quick = state == kDialogState && arg == kQuickSelectArg;
+            if ((banks.wheel_open() || quick) &&
+                (state != last_game_state || arg != last_state_arg)) {
+                last_game_state = state;
+                last_state_arg = arg;
+                mod.info("RAC2: menu transition state=" + std::to_string(state) +
+                         " arg=" + std::to_string(arg) +
+                         (quick ? " (Quick Select)" : " (not Quick Select)"));
             }
-            return mode == kWheelMenuMode;
+            return quick;
         }
         return false;
     }
@@ -161,7 +182,7 @@ private:
         wheel.before_update(banks, false, l1, r1);
         last_triangle = false;
         visible_page.store(0, std::memory_order_relaxed);
-        last_menu_mode = -1;
+        last_game_state = last_state_arg = -1;
     }
 
     void sync_inventory() {
@@ -199,7 +220,8 @@ private:
         }
         banks.close_wheel();
         visible_page.store(0, std::memory_order_relaxed);
-        mod.info("RAC2: loaded extra wheels for save slot " + std::to_string(slot));
+        if (slot < 0) mod.info("RAC2: no save slot reported by host; extra pages are session-only");
+        else mod.info("RAC2: loaded extra wheels for save slot " + std::to_string(slot));
     }
 
     openrac::gaddr level_data(openrac::gaddr address) const {
@@ -292,7 +314,7 @@ private:
     Banks banks;
     WheelSession wheel;
     int last_save_slot = -2;
-    int last_menu_mode = -1;
+    int last_game_state = -1, last_state_arg = -1;
     std::atomic<int> visible_page{0};
     bool last_triangle = false;
     bool last_l1 = false, last_r1 = false;

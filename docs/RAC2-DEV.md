@@ -81,3 +81,13 @@ remains active through the paused wheel's release animation. Other menu modes
 are rejected; the log records the observed native mode on transition.
 This does not yet supply dedicated native wheel hooks or guarantee all
 selection timings. Validate mode relocation and page switching in game.
+
+## Dev.4: use the port's Quick Select context
+
+Dev.3's menu-saved-state check returned 0 in the live log. Replace it with the
+same discriminator as OpenRAC's port/game/rac2/host/touch.c: g_nGameState
+(0x001A8BB0) == 4 and g_gameStatePendingArgA (0x001AA0F8) == 7, using
+mod.relocate() (the SDK equivalent of OPENRAC_DATA). Log the actual state
+and argument, and recover a held-Triangle session in that confirmed menu.
+The overlay API is unchanged. If save_slot_current() returns -1, extra
+pages are available in memory but not written to a guessed save slot.
