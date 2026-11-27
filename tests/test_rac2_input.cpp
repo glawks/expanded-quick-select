@@ -1,5 +1,6 @@
 #include "expanded_quick_select/banks.hpp"
 #include "expanded_quick_select/rac2_input.hpp"
+#include "expanded_quick_select/rac2_save_slot.hpp"
 #include "expanded_quick_select/rac2_close.hpp"
 #include "expanded_quick_select/rac2_inventory.hpp"
 #include <iterator>
@@ -16,6 +17,17 @@
 int main() {
     namespace eqs = expanded_quick_select;
     namespace close = eqs::rac2_close;
+    namespace save = eqs::rac2_save_slot;
+    static_assert(save::native_key(0, 0) == 0);
+    static_assert(save::native_key(0, 1) == 1);
+    static_assert(save::native_key(1, 1) == 5);
+    static_assert(save::native_key(-1, 0) == -1);
+    static_assert(save::native_key(0, -1) == -1);
+    static_assert(save::native_key(0, 4) == -1);
+    static_assert(save::choose(-1, -1, 1) == 1);
+    static_assert(save::choose(-1, 100, 1) == 100);
+    static_assert(save::choose(2, 100, 1) == 2);
+    static_assert(save::choose(-1, -1, -1) == -1);
     static_assert(close::context(true, false, 4, 7));
     static_assert(close::context(true, false, 4, 0));
     // Observed dev.7 failure: gameplay resumes after 3 frames, before commit.
@@ -99,5 +111,18 @@ int main() {
     assert(store.load(0).value() == valid);
     eqs::SlotStore rac1_store(dir);
     assert(!rac1_store.load(0).has_value()); // RAC1 rejects RAC2's higher IDs
+    eqs::SlotStore custom(dir / "custom", 55);
+    const eqs::Slots empty{};
+    const eqs::Slots distinct{{22, 30, 0, 42, 0, 0, 0, 0}};
+    assert(custom.save(1, eqs::Page::Secondary, distinct));
+    assert(custom.save(1, eqs::Page::Fourth, empty));
+    assert(custom.save(0, eqs::Page::Secondary, valid));
+    // A fresh store simulates the next process; empty custom pages are
+    // distinguishable from missing files and slot 1 cannot read slot 2.
+    eqs::SlotStore restarted(dir / "custom", 55);
+    assert(restarted.load(1, eqs::Page::Secondary).value() == distinct);
+    assert(restarted.load(1, eqs::Page::Fourth).value() == empty);
+    assert(restarted.load(0, eqs::Page::Secondary).value() == valid);
+    assert(!restarted.load(0, eqs::Page::Fourth).has_value());
     std::filesystem::remove_all(dir);
 }

@@ -2,6 +2,7 @@
 #include "expanded_quick_select/banks.hpp"
 #include "expanded_quick_select/gameplay_hint.hpp"
 #include "expanded_quick_select/rac2_input.hpp"
+#include "expanded_quick_select/rac2_save_slot.hpp"
 #include "expanded_quick_select/rac2_close.hpp"
 #include "expanded_quick_select/rac2_inventory.hpp"
 #include "expanded_quick_select/sessions.hpp"
@@ -46,6 +47,14 @@ constexpr openrac::gaddr kInventoryOwned = 0x001A7AF8;
 constexpr openrac::gaddr kGameState = 0x001A8BB0;
 constexpr openrac::gaddr kStateArg = 0x001AA0F8;
 constexpr openrac::gaddr kPauseState = 0x001F2840;
+// Native load_slot_menu_update and save_start_to_slot record the chosen
+// file here. +0x148 is the active card; +0x18 of its 0xA0-byte record
+// is the signed, zero-based file index used by MemcardSave/sceMcOpen.
+constexpr openrac::gaddr kMemcardState = 0x001393E0;
+constexpr openrac::gaddr kActiveCardOffset = 0x148;
+constexpr openrac::gaddr kCardStride = 0xA0;
+constexpr openrac::gaddr kCardFileOffset = 0x18;
+constexpr int kLoadMenuLevel = 98;
 constexpr openrac::gaddr kResidentBase = 0x001A8CFC;
 constexpr openrac::gaddr kEditorObjectOffset = 0x3A388;
 constexpr openrac::gaddr kEditorCursorOffset = 0x7CC;
@@ -265,9 +274,16 @@ private:
         } else {
             customised[editor_page] = true;
             dirty_pages[editor_page] = true;
-            if (last_save_slot >= 0 &&
-                custom_store.save(last_save_slot, p, current))
-                dirty_pages[editor_page] = false;
+            if (last_save_slot >= 0) {
+                if (custom_store.save(last_save_slot, p, current)) {
+                    dirty_pages[editor_page] = false;
+                    mod.info("RAC2: saved custom page " + std::to_string(editor_page + 1) +
+                             " for layout key " + std::to_string(last_save_slot));
+                } else if (!warned_store) {
+                    warned_store = true;
+                    mod.warn("RAC2: custom layout write failed; will retry");
+                }
+            }
         }
         mod.info("RAC2: captured custom editor page " + std::to_string(editor_page + 1));
     }
@@ -498,7 +514,7 @@ private:
     }
 
     void sync_inventory() {
-        if (banks.page_count() < 2) return;
+        if (banks.page_count() < 2 || mod.loaded_level() == kLoadMenuLevel) return;
         const auto mem = mod.memory();
         const auto primary = mem.read<Slots>(mod.relocate(kNativeSlots));
         if (!valid_game_slots(primary, kRac2MaxItemId)) return;
@@ -553,10 +569,41 @@ private:
         }
     }
 
+    int native_save_slot() const {
+        const auto mem = mod.memory();
+        const auto state = mod.relocate(kMemcardState);
+        if (!guest_range(state, kActiveCardOffset + sizeof(std::int32_t))) return -1;
+        const auto card = mem.read<std::int32_t>(state + kActiveCardOffset);
+        if (card < 0 || card > 1) return -1;
+        const auto slot = mem.read<std::int16_t>(state +
+            static_cast<openrac::gaddr>(card) * kCardStride + kCardFileOffset);
+        return rac2_save_slot::native_key(card, slot);
+    }
+
     void refresh_slot() {
+        // Do not adopt a highlighted/queued save while browsing menus or
+        // while the loading screen still contains the previous inventory.
+        // The editor and gameplay wheel both retain the last confirmed key.
+        const auto status = mod.play_status();
+        if (status.phase != OPENRAC_PLAY_PLAYING || mod.loaded_level() < 0 ||
+            mod.loaded_level() == kLoadMenuLevel || banks.wheel_open() ||
+            editor_active || closing) return;
         const int host_slot = mod.save_slot_current();
-        const int slot = host_slot >= 0 ? host_slot : manual_profile;
+        const int native_slot = native_save_slot();
+        const int slot = rac2_save_slot::choose(host_slot, manual_profile, native_slot);
         if (slot == last_save_slot) return;
+        mod.info("RAC2: layout key change " + std::to_string(last_save_slot) + " -> " +
+                 std::to_string(slot) + " (host=" + std::to_string(host_slot) +
+                 ", native=" + std::to_string(native_slot) + ")");
+        // Retry any failed writes against the OLD key before discarding it.
+        if (last_save_slot >= 0) {
+            for (std::size_t p = 1; p < kMaxPages; ++p) {
+                if (!dirty_pages[p]) continue;
+                auto& destination = customised[p] ? custom_store : store;
+                if (!destination.save(last_save_slot, page_at(p), banks.slots(page_at(p))))
+                    mod.warn("RAC2: could not flush old layout page " + std::to_string(p + 1));
+            }
+        }
         last_save_slot = slot;
         dirty_pages.fill(false);
         customised.fill(false);
@@ -574,9 +621,16 @@ private:
         }
         banks.close_wheel();
         visible_page.store(0, std::memory_order_relaxed);
-        if (slot < 0) mod.info("RAC2: no save slot reported by host; extra pages are session-only");
-        else if (host_slot < 0) mod.info("RAC2: loaded manual layout profile " + std::to_string(slot - 99));
-        else mod.info("RAC2: loaded extra wheels for save slot " + std::to_string(slot));
+        if (slot < 0) mod.info("RAC2: no confirmed save slot; extra pages are session-only");
+        else if (slot >= 100) mod.info("RAC2: loaded manual layout profile " + std::to_string(slot - 99));
+        else mod.info("RAC2: loaded extra wheels for save slot " + std::to_string(slot % 4 + 1) +
+                      " (card " + std::to_string(slot / 4 + 1) +
+                      ", " + (rac2_save_slot::valid(host_slot) ? "host" : "native") + ")");
+        if (slot >= 0) {
+            for (std::size_t p = 1; p < kMaxPages; ++p)
+                if (customised[p])
+                    mod.info("RAC2: restored custom page " + std::to_string(p + 1));
+        }
     }
 
     static bool guest_range(openrac::gaddr addr, std::size_t size) {

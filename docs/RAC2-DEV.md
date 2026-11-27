@@ -156,3 +156,20 @@ opt-in manually selected profile 1–4 (independent of host save slots) for
 restart persistence. The user must select the corresponding profile when
 switching saves until native save-slot reporting is available. In-game verify
 page callback recognition, cursor mapping, assignment, exit, and persistence.
+
+## Dev.10: native save slot fallback
+
+Dev.9 live log confirmed the native editor and page changes, but reported
+session-only layouts. Different saves appeared to have different wheels
+because unowned items were masked, not because separate layouts were loaded.
+Read the same active-card/file fields used by native MemcardSave (0029AE78),
+load_slot_menu_update (002DCFE8), and save_start_to_slot (002DDEC8):
+g_memcard_state (0x001393E0) + 0x148 is the active card (0 or 1), and
+card*0xA0 + 0x18 is its signed file index (0–3). Use executable relocation,
+validate ranges, and adopt a slot only in normal gameplay outside level 98,
+not during editor, wheel or load transitions. Host ID takes precedence;
+explicit manual profiles remain compatible. Restore saved custom pages and
+write edits to their own sidecars, including entirely empty wheels. Log key
+changes and custom reads/writes; test distinct files across store instances.
+Automatic fallback must still be verified in the running game. Save-as and
+new-game slot reuse semantics are not yet explicitly tracked.

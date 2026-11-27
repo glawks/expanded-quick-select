@@ -2,7 +2,7 @@
   "format": 2,
   "id": "expanded-quick-select",
   "name": "Expanded Quick Select",
-  "version": "2.0.0-dev.9",
+  "version": "2.0.0-dev.10",
   "author": "glawks",
   "description": "Development: RAC1 native wheel and optional Weapon Wheel Pause bridge; experimental RAC2 prototype.",
   "type": "native",
@@ -95,7 +95,7 @@
       "choices": [
         {
           "value": "auto",
-          "name": "Automatic / session-only"
+          "name": "Automatic (native save slot)"
         },
         {
           "value": "1",
@@ -114,7 +114,7 @@
           "name": "Manual profile 4"
         }
       ],
-      "description": "When OpenRAC cannot report the save slot, choose a manual profile to persist custom layouts across restarts. Select the same profile for the same save. Restart after changing."
+      "description": "Automatically use the active save slot, falling back to native RAC2 memory-card state. Manual profiles override native detection when the host does not report a slot. Restart after changing."
     }
   ],
   "license": "MIT",
