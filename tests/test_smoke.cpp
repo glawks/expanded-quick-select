@@ -8,6 +8,6 @@
 
 int main() {
     using namespace expanded_quick_select;
-    assert(std::string_view(kModId) == "expanded-quick-select");
-    assert(std::string_view(kModVersion) == "2.0.0-dev.1");
+    assert(std::string_view(kModId) == EQS_EXPECTED_ID);
+    assert(std::string_view(kModVersion) == EQS_EXPECTED_VERSION);
 }

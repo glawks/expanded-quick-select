@@ -11,8 +11,18 @@ add_library(expanded_quick_select_core STATIC src/banks.cpp src/slot_store.cpp s
 target_include_directories(expanded_quick_select_core PUBLIC include)
 
 if(BUILD_TESTING)
+    # Keep the smoke test tied to the packaged manifest instead of a
+    # hardcoded development version. Still catches mismatched native identity.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/openrac-mod.json")
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/openrac-mod.json" eqs_manifest)
+    string(JSON eqs_manifest_id GET "${eqs_manifest}" id)
+    string(JSON eqs_manifest_version GET "${eqs_manifest}" version)
     add_executable(test_smoke tests/test_smoke.cpp)
     target_include_directories(test_smoke PRIVATE include)
+    target_compile_definitions(test_smoke PRIVATE
+        EQS_EXPECTED_ID="${eqs_manifest_id}"
+        EQS_EXPECTED_VERSION="${eqs_manifest_version}")
     add_test(NAME smoke COMMAND test_smoke)
 
     add_executable(test_banks tests/test_banks.cpp)
